@@ -1,0 +1,26 @@
+#! /bin/ksh
+
+	titlesummary \
+		'-successful dump=dump successful' \
+		'-failed dump=dump failed' \
+		'-failed dump=uncopied' \
+		'-missing dump=missing' \
+		'-fail=no waltz backups' \
+		'-Access denied' \
+		'-@failed connection=Permission denied' \
+		'-@failed verification=verification failed.' \
+		'-@failed connection=Access denied' \
+		'@MySQL dump failed' \
+		'@Posgresql dump failed' \
+		'@uncopied root configuration files' \
+		'@no waltz backups' \
+		'@MySQL dump succeeded' \
+		'@MySQL successful dump=MySQL dump successful' \
+		'@MySQL successful dump=MySQL dump succeeded' \
+		'@Posgresql successful dump=Posgresql dump successful' \
+		'@Cannot' \
+		'@damaged' \
+		'@No space left' \
+		'@excluded host=excluded' |
+	age
+

@@ -1,0 +1,28 @@
+#! /bin/ksh
+
+# MDA raid report
+
+##clushopt -Lq
+##groupby host
+
+
+# Ignore Orchre
+case $(hostname) in (ochre) exit;; esac
+
+# Utilities installed?
+type mdadm 2>/dev/null 1>&2 || exit 0
+test -e /etc/mdadm.conf || exit 0
+
+# Grab any RAID devices
+RAID=$( ls /dev/md[0-9]* 2>/dev/null | egrep -v p )
+[ -z "$RAID" ] && exit
+
+# Look for the monitoring daemon
+egrep MAILADDR /etc/mdadm.conf  >/dev/null || echo Event mail address missing.
+ps -ef|grep mda | egrep monitor >/dev/null || echo No monitor
+echo
+
+# Run the report (put a newline before any device line and underline it).
+exec mdadm -D $RAID | sed -e '/^\/dev\/md/{i
+p;s/./-/g}'
+

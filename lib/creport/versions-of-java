@@ -1,0 +1,43 @@
+#! /bin/sh
+
+# determine java verions
+#    ARF Sept 2012
+
+##groupby host
+## errors hide
+
+# start the payload on the client.
+
+rpm -q jre jdk java-\* 2>&1 | egrep -v ' not '
+
+locate -b '\java' | 
+	egrep -v '/usr/lib/jvm/java-' | 
+	xargs -r -n1 file |
+	sed -n -e 's/: ELF .*//p' |
+	while read file
+do
+	# Ignore non-files and any sym links
+	[ -f "$file" ] || continue
+	[ -h "$file" ] && continue
+	[ -x "$file" ] || continue
+
+	VERSION=$( su bin -s /bin/sh -c "$file -version" 2>&1 | sed -n -e 's/"//g' -e 's/.* version //p' )
+	VENDOR=$(  su bin -s /bin/sh -c "$file -version" 2>&1 | tail -1 | sed -n -e 's/java //ig' -e 's/[() ].*//p')
+
+	[[ "$VENDOR" = *ksh* ]] && VERSION='?' && VENDOR="arch?"
+
+	echo "$VERSION	$VENDOR	$file"
+	continue
+
+	echo "File	$file"
+	echo "Host	$(hostname -f)"
+
+	su bin -s /bin/sh -c "$file -version" 2>&1 | sed -n 's/.* version //p' | sed -e 's/^/Version	/'
+
+	#(rpm -qf "$file" | egrep -v 'is not owned by any package' || echo none ) | sed -e 's/^/Package	/'
+
+	echo
+
+done
+
+

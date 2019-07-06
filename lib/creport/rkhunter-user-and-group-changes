@@ -1,0 +1,21 @@
+#!/bin/ksh
+
+# Check any passwd or group changes made during the day.
+# Run this during the evening to catch and clear any changes.
+# Better to have one email than 120.
+#
+# ARF 31 August 2014
+
+#[ $# = 0 ] && set -- -w @NIHnet
+#paragraph -u "File, User and Group Changes Noticed by rkhunter" |
+
+# creport options
+##clushopt -qL
+##groupby host
+##errors hide
+
+rkhunter --report-warnings-only --enable passwd_changes,group_changes
+
+rkhunter --report-warnings-only --enable properties ||
+	rkhunter  --propupd '/root/.ssh/authorized_keys' 2>/dev/null
+

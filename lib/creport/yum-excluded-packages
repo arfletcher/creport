@@ -1,0 +1,53 @@
+#! /bin/ksh
+
+# determine packages that aren't being updated due to exclude statements
+#    Shahar Goldin June 2012
+#    ARF August 2012
+#    ARF December 2012
+
+## errors hide
+
+
+# start the payload on the client.
+
+# Sed script to join space started continuation lines.
+# see http://richmegginson.livejournal.com/18726.html?nojs=1
+joincont () { sed -e ':a' -e '$!N;s/\r\?\n //;ta' -e 'P;D' "$@" ; }
+
+PATH=/usr/local/sbin:$PATH
+
+# Parse command line
+! type yum >/dev/null 2>&1 && echo yum not used && exit 0
+
+# Trivial exclude check.....
+#egrep '^exclude' /etc/yum.conf /etc/yum.repos.d/* 2>/dev/null
+
+# Excluded hosts - too old anyway
+[ $(uname -n) = mustard ] && exit
+[ $(uname -n) = ochre ]   && exit
+
+# Temporary files.
+WITH="$(mktemp /tmp/yum-excludes.XXXXXX)" 
+WITHOUT="$(mktemp /tmp/yum-excludes.XXXXXX)" 
+trap '/bin/rm -f $WITH $WITHOUT' 0 1 2 3 4 5 6 7 8
+
+
+# Stop any unfortuate timing issues.
+yum -q clean all > /dev/null 2>&1
+
+# Look for updates with and without excludes.
+yum check-update 2>/dev/null | joincont | sed -e '1,/^$/d' > $WITH 
+
+yum check-update --disableexcludes=all 2>/dev/null | joincont | sed -e '1,/^$/d' > $WITHOUT 
+[ ! -s "$WITHOUT" ] && exit
+
+# The first time sometimes fails! Why?
+if [ ! -s "$WITH" ] 
+then
+	#echo first yum, with excludes, failed or no updates!
+	yum check-update 2>/dev/null | joincont | sed -e '1,/^$/d' > $WITH 
+fi
+
+# Differences.....
+diff -b $WITH $WITHOUT 2>&1 | sed -n -e 's/^> //p'
+

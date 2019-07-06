@@ -1,0 +1,13 @@
+#!/bin/ksh
+
+# Globus reporting
+#clush -o -4 -w @globus perl |
+# creport -C globus-transfers -w @globus
+
+	titlesummary \
+		'@$1 file=USER\s+(\S+)' \
+		'@File=FILE' \
+		'@Byte#^\s+NBYTES\s+(\d+)' \
+		|
+	b2h
+

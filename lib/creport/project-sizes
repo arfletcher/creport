@@ -1,0 +1,65 @@
+#! /bin/ksh
+
+# Report on each automount home direct with subtotals.
+# Useful to guide future home dir reorganisations.
+#
+# For quick scan, use -q option as the first argument.
+# Otherwise list hosts to filter on.
+#
+# Header:
+#    USER     GROUP      NAME       SIZE       LOCATION
+#    druss    btris      deid       27896       yak:/export/2/project/deid
+#
+# ARF
+
+PATH=/usr/local/sbin:$PATH
+
+##clushopt -qNL
+##post sort | uniq | column -t
+##errors hide
+
+usage="Usage: $0 [-q] [-r]"
+quick=
+duopt=h
+while getopts "qrh" arg
+do
+	case $arg in
+		q) quick='echo ' ;; # quick scan.
+		r) duopt='' ;;	# turn off human units option for du
+		h|*) echo $usage; exit 1 ;;
+	esac
+done
+shift $(($OPTIND - 1))
+
+filter () { cat; }
+[ $# != 0 ] && eval "filter () { egrep '"$(echo $@ | sed -e 's/ /|/g')"' -; }"
+
+# Anything to scan?
+[ ! -d /export ] && exit 0
+
+H=$(hostname -s)
+#find /export -maxdepth 3 -type d \( -name project -o -name workspace \) | sed -e 's/^/xxxx /'
+
+# Data header
+HEADER="USER	GROUP	PROJ	SIZE	LOCATION"
+
+find /export -maxdepth 2 -type d \( -name project -o -name workspace \) |
+while read dir
+do
+	cd "$dir"
+	for d in $(ls)
+	do
+		#[ -h "$d" ] && continue
+
+		U=$(stat -c "%U" "$d")
+		G=$(stat -c "%G" "$d")
+
+		[ -z "$U" ] && echo "$H odd dir '$dir'" && continue
+		#echo -n "$U@mail.nih.gov	"
+		echo -n "$U	$G	$d	"
+		$quick du -s$duopt "$dir/$d" 2>/dev/null | sed -e 's/du -sh/--/' -e 's/  */	/' 
+	done | sed -e "s!/!$H:/!"
+done | sed -e "1i$HEADER"
+
+exit 0
+

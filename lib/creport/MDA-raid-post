@@ -1,0 +1,14 @@
+#!/bin/ksh
+
+# Central Meta-Disk RAID Report
+
+titlesummary \
+	'@Disc=active sync' \
+	'@\u$1 volume=Raid Level : (raid\d+)' \
+	'@Active volume=State : (clean|active)' \
+	'@No monitor' \
+	'@checking volume=checking' \
+	'@State\s+:\s+\K(.+)' \
+	-degraded -rebuilding -removed -resyncing  \
+	'@address missing' \
+

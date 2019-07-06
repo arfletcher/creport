@@ -1,0 +1,47 @@
+#!/bin/ksh
+
+# Look for JetStor RAIDs and report their status.
+# ARF 07 November 2014
+# ARF 04 November 2018
+
+# creport options
+## groupby host
+
+JETSTOR=jetstor
+JETSTOR=192.168.1.100
+
+error () { echo "$@"; exit 2; }
+
+# Is there a JetStor?
+
+#type fping >/dev/null 2>/dev/null || error "fping not installed"
+#fping -q $JETSTOR 2>/dev/null || exit
+
+# Use ping as it's always there.
+ping -q -c 2 $JETSTOR >/dev/null || exit 0
+
+# Need w3m to talk to the JetStor
+type w3m >/dev/null 2>/dev/null || error "w3m not installed"
+
+# Grap the volume status page
+# NB staright w3m just hangs for some reason... so use curl
+
+curl -q -s --digest -u admin:00000000 http://192.168.1.100/ http://192.168.1.100/hierarch.htm |
+	sed -e 's/width=[^ ]*//ig' |
+	sed -e 's/border=[^ ]*//ig' |
+	w3m -o graphic_char=0 -T text/html -dump -cols 200 |
+	egrep -i '(Slot|Set)' |
+	egrep 'GB$'
+
+curl -q -s --digest -u admin:00000000 http://192.168.1.100/ http://192.168.1.100/hwmon.htm |
+	sed -e 's/width=[^ ]*//ig' | 
+	sed -e 's/border=[^ ]*//ig' |
+	w3m -o graphic_char=0 -T text/html -dump -cols 200 |
+	egrep -i Fail
+
+# http://192.168.1.100/sysinfo.htm
+# http://192.168.1.100/hwmon.htm
+# http://192.168.1.100/evt0.htm
+
+exit 0;
+

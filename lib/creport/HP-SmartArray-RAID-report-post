@@ -1,0 +1,16 @@
+#!/bin/ksh
+
+# Central HP SmartArray RAID report
+# rothmb 20150410
+# ARF 03 November 2018
+
+titlesummary \
+  	'@Enclosure' \
+	'@Normal=OK' \
+	'@Predictive Failure' \
+	'@-failed disc=Failed' \
+	'-Warning=Predictive' \
+	'@FW upgrade=FIRMWARE UPGRADE REQUIRED' \
+	'-Another instance' \
+
+

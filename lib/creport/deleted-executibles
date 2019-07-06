@@ -1,0 +1,20 @@
+#! /bin/ksh
+
+# Find any running executibles with deleted programs
+
+# creport options
+## errors hide
+
+PATH=/usr/bin:/bin
+PATH=/usr/sbin:/sbin:$PATH
+PATH=/usr/local/bin:$PATH
+PATH=/usr/local/sbin:$PATH
+
+ls -al /proc/*/exe 2>&1 |
+	sed -n 's/ (deleted)$//p' | 
+	sed -e 's/;[a-f0-9]*$//' |
+	sed -e 's!.*/proc/!!' -e 's!/exe -> !  !'
+
+exit 0
+
+

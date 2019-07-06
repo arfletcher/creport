@@ -1,0 +1,59 @@
+#!/bin/sh
+
+[ "x$1" = "x-x" ] && shift && set -x
+
+# Install needed packages on all our systems.
+
+##clush -a
+##Groupby host
+
+exec 2>&1
+
+# Ignore
+lsb_release -sir | egrep 'CentOS\ [345].' >/dev/null && exit 0
+
+# Install needed packages
+
+NEEDED="ksh wmctrl zsh xterm clamav virt-what ssh-x509-auth moreutils fping waltz"
+NEED_RPM="xorg-x11-xauth perl-Proc-ProcessTable redhat-lsb-core dejavu-sans-mono-fonts xorg-x11-apps smipmicfg dejavu-sans-mono-fonts perl-File-chdir"
+NEED_DEB="xauth libproc-processtable-perl chkconfig libfile-chdir-perl"
+
+if ! type lsb_release >/dev/null 
+then
+	type yum > /dev/null && yum -y install redhat-lsb-core
+	type apt > /dev/null && apt -y install lsb-release 2>&1
+fi
+! type lsb_release >/dev/null  && echo Ooops && exit 1
+
+# How to check and to install
+CHECK=
+INSTALL=
+case "$(lsb_release -si)" in
+	Fedora)		CHECK="rpm -q"; INSTALL="dnf -y install"; TYPE=RPM ;;
+	RedHat*)	CHECK="rpm -q"; INSTALL="yum -y install"; TYPE=RPM;;
+	CentOS)		CHECK="rpm -q"; INSTALL="yum -y install"; TYPE=RPM;;
+	Debian)		CHECK="dpkg -L"; INSTALL="apt -y install"; TYPE=DEB;;
+	Ubuntu)		CHECK="dpkg -L"; INSTALL="apt -y install"; TYPE=DEB;;
+
+	*) echo Unknown distribution ; exit 1 ;;
+esac
+
+# Sanity
+[ -z "CHECK" ]   && echo Do not know how to check   && exit 1
+[ -z "INSTALL" ] && echo Do not know how to install && exit 1
+
+# What are we missing
+NEED=$(
+for p in $NEEDED $(eval "echo \$NEED_$TYPE")
+do
+	$CHECK $p >/dev/null 2>&1 && continue
+	echo $p
+done
+)
+
+# Anything to do
+[ -z "$NEED" ] && exit;
+
+# Install
+$INSTALL $NEED
+

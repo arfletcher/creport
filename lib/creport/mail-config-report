@@ -1,0 +1,20 @@
+#!/bin/sh
+
+# Mail config report
+# ARF 28 April 2015
+
+## Info These systems need to be configured to send email to cake
+			#-u "Sendmail submit.mc Status" 
+
+###########################################################
+
+# Payload
+
+#[ $(lsb_release -si) = Debian ] && exit
+ 
+# RedHat-esque systems
+[ -f /etc/mail/submit.mc ] && egrep '^FEATURE\(.msp.' /etc/mail/submit.mc | egrep -v cake
+
+# Debian?
+exit 0
+

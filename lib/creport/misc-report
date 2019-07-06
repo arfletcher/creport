@@ -1,0 +1,38 @@
+#!/bin/ksh
+
+# Misc report
+# Find the current running kernel in a version/time ordered list of kernel packages.
+#
+
+# Creport options.
+## post sed -e 's/: \([0-9]*\) \(Kernel:\)/(\1): \2/'
+## clushopt -qL
+## groupby results
+
+# Payload
+
+# RPM systems - cannot find equivlent for DEBs.
+# Sort by build date.
+#	rpm --qf '%{BUILDTIME} %{Version}-%{release}.%{arch}\n' -q kernel | sort -nr | nl | egrep $(uname -r)
+
+# Look at the kernel image times
+ls -t1 /boot/vmlinuz-* | sed -e 's/.boot.vmlinuz-//' | nl | egrep $(uname -r) | sed -e 's/^  *//' -e 's/[[:space:]].*//' | egrep -v '^1$' | sed -e 's/$/ Kernel: newer installed/'
+
+# Report kernel anyway
+uname -r | sed -e 's/^/Kernel: /'
+
+# Nameservers
+{ sed -n -e 's/^[[:space:]]*nameserver//p' /etc/resolv.conf | sort | paste -d, -s | egrep . || egrep None; } | sed 's/^/Nameservers: /'
+
+# IPMI
+[ "Supermicro" = "$(dmidecode -s system-manufacturer)" ] &&
+ipmicfg -m 2>&1 |
+	sed -n 's/IP=//p' |
+	sed -e 's/^192\..*/LAN/' -e 's/0.0.0.0/Disabled/' -e 's/[0-9][0-9]\.[0-9][0-9]\.[0-9][0-9]\.[0-9][0-9]/on NIHnet!/' |
+	sed -e 's/^/SM IMPI /' 
+
+
+#dmidecode -s system-manufacturer | sed -e "s/[[:space:]]*$//" | sed -e 's/^/Manufacturer /'
+
+exit 0
+

@@ -1,0 +1,97 @@
+#!/bin/bash
+
+# Look for LUKS encrypted partions without the correct passphrases
+# PWLIST1, PWLIST2, PWLIST3 should be defined in
+# /etc/creport/luks-escrow-passphrase
+# 
+# ARF Nov 2018
+
+#PWLIST1=
+#PWLIST1=
+#PWLIST1=
+
+[ -z "$PWLIST1" ] && echo Password list 1 is not defined && exit 1
+[ -z "$PWLIST2" ] && echo Password list 2 is not defined && exit 1
+[ -z "$PWLIST3" ] && echo Password list 3 is not defined && exit 1
+
+# NB uses a bash-ism to hide passwords.
+
+# Debugging.
+[ "x$1" = "x-x" ] && shift && set -x
+
+## clushopt -x @FW_leg,strainer
+## clush -a
+## post sed -e 's!: /!_/!'
+## groupby results
+
+# Check we can clean up.
+#! whence -f shred >/dev/null && echo Missing shred && exit 1
+
+# Temporary key file.
+#export TMPDIR=/dev/shm
+#KEY=$(mktemp --suffix=.key) || exit
+#trap 'shred -u "$KEY"' 0 1 2 3 4 5 6 7 8 9 10 11 12 13
+
+# Take a list of potential passwords and check if any unlock the partition.
+pwcheck () {
+	P="$1"; shift
+	T="$1"; shift
+
+	{
+	nl | while read N PW
+	do
+		#echo -n "$PW" > "$KEY"
+		#cryptsetup luksOpen --test-passphrase --key-file "$KEY" "$P" 2>/dev/null && 
+
+		# This is a bash-ism that will hide the password.
+	        exec 4<<<"$PW"
+        	cryptsetup luksOpen --test-passphrase "$P" <&4 2>/dev/null && 
+			echo "OK $T Passphrase $N"
+
+	done | egrep . || echo Missing $T Passphrase
+	} | sed -e "s!^!$P: !"
+}
+
+# Default partions to try.
+#[ $# = 0 ] && set -- ~(N)/dev/s[vd]*
+
+#NB -p option to lsblk isn't in C6
+[ $# = 0 ] && set -- $(lsblk --output NAME -ln | sed -e 's!^!/dev/!' | sort | uniq)
+
+# Check any LUKS encrypted partitions
+for p
+do
+	# Ignore some devices......
+	[ -f /etc/luks-report-ignore ] &&
+		egrep -x "$p" /etc/luks-report-ignore >/dev/null &&
+		continue
+
+	# LUKS?
+	! cryptsetup isLuks "$p" 2>/dev/null && continue
+
+	# if contains root....
+	if lsblk "$p" | egrep '[[:space:]]/$' >/dev/null
+	then
+		cryptsetup luksDump "$p" | sed -n -e  's/Key Slot //' -e 's/: ENABLED//p' | sort | paste -s -d, | sed -e 's/^/Root disc key slots /'
+	fi
+
+	# CentOS 6 is too old for this test
+	! man cryptsetup | egrep test-passphrase >/dev/null && echo "$p: test-passphrase option not supported" && continue
+
+	# Check to see if this is a data disc.....
+	sed -n -e 's!.*/etc!/etc!p' /etc/crypttab | sort | uniq | while read FILE
+	do
+		cryptsetup luksOpen --test-passphrase --key-file "$FILE" "$p" 2>/dev/null && echo "$p: OK File"
+	done | egrep . && continue
+
+	# Check offline passphrases - check no further if successful
+	echo "$PWLIST1" | pwcheck "$p" "offline" | egrep -v Missing && continue
+
+	# Check primary passphrases
+	echo "$PWLIST2" | pwcheck "$p" "primary"
+
+	# Check escrow passphrases
+	echo "$PWLIST3" | pwcheck "$p" "escrow"
+
+done | egrep . || echo No LUKS Partitions
+

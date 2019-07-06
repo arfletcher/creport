@@ -1,0 +1,63 @@
+#!/bin/ksh
+
+# report generation: creport -C lsi-raid-report
+##clushopt -qL
+##clush -a
+##errors hide
+##groupby host
+
+# Summarise Mega RAID discs and volumes.
+# ARF
+
+#MegaCli="/opt/MegaRAID/MegaCli/MegaCli64"
+MegaCli="/usr/sbin/MegaCli64"
+
+exec 2>&1
+
+# ARF
+PATH=/sbin:/usr/sbin:$PATH
+#PATH=/opt/MegaRAID/MegaCli:$PATH
+
+# Install the required PCI card utility.
+if ! type lspci > /dev/null 2>/dev/null
+then
+        # Try to install
+        yum -y install pciutils
+        apt-get -y install pciutils
+fi
+
+# Do we have a LSI MegaRAID card?
+lspci | egrep -i megaraid > /dev/null || exit 0
+
+# Install the required package.
+if [ ! -x $MegaCli ] 
+then
+        echo installing MegaRAID package
+        yum -y install MegaRAID
+fi
+
+# Sanity check.
+[ -x $MegaCli ] || exit 1
+
+# List each drive status
+$MegaCli -PDlist -aALL -NoLog |
+   perl -ne '
+	if ( $_ =~ /Slot|state|Error/){ 
+                  chomp; 
+                  $_ .="\t"; 
+                  s/Slot/\nSlot /; 
+                  s/ Count//; 
+                  s/Firmware state://;
+                  s/Error/Err/; 
+                  s/ Number: //;
+                  print;}
+                END {print "\n";}
+   '
+
+echo
+
+# List the status for all Virtual Drives.
+#lsi.sh status 2>&1 |
+lsiraid status 2>&1 |
+	perl -ne 'BEGIN{$/="";} /Virtual Drive/ && print'
+

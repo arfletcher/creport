@@ -1,0 +1,15 @@
+#! /bin/sh
+
+# Check there are no UID 0 accounts other than root. NIST requirment.
+# 		Anthony Fletcher 16 Dec 2009
+
+##info See NIST SP 800-53, AC-2
+##clushopt -qL
+##groupby results
+
+# Look for UID 0 accounts
+! egrep '^[^:]*:[^:]*:0:' /etc/passwd | egrep -v '^root:' && echo No non-root UID 0 accounts
+
+# exit with the reverse error status.
+#[ $? != 0 ]
+

@@ -1,0 +1,112 @@
+#!/bin/ksh
+
+# Get a report on agent deployment.
+
+# creport options.
+##clushopt -Lq -x @FW_leg
+##groupby results
+
+###### Payload ###############
+
+# List of systems to exclude.
+[[ $(lsb_release -sir) = CentOS\ 5.* ]] && echo Ignored && exit 0
+
+# Check on the various agents
+
+reportagent () {
+	name="$1"; shift
+	ps h -C "$name" >/dev/null && echo "$@" is running || echo "$@" is not running
+}
+
+lsb_release -si | egrep -i "CentOS|Redhat|Scientific" >/dev/null && reportagent cbdaemon CarbonBlack
+
+reportagent nessusd Tenable Agent
+
+reportagent BESClient BigFix
+
+if egrep "\\b$(hostname -f)\\b" /var/polka/etc/hosts 2>/dev/null | egrep '#.*\bexternal\b' >/dev/null
+then
+	reportagent splunkd Splunk Forwarder
+fi
+
+# check that clamav antivirus is installed.
+[ -x /usr/bin/clamscan ] && echo clamav is installed || echo clamav is not installed
+
+###############################################
+# Agent status.
+
+###############################################
+# Tenable 
+
+# Tenable status
+/opt/nessus_agent/sbin/nessuscli agent status 2>&1 | egrep -i Link | egrep -v failed | sed -e 's/to:/to/' -e 's/\[.*\]/Tenable:/'
+
+whence ifne >/dev/null || echo Command ifne missing
+
+# Check Tenable daily scan
+LOG=/opt/nessus_agent/var/nessus/logs/backend.log
+if [ -f $LOG ]
+then
+	sed -n -e "s/.*Started remote scan '//p" "$LOG" | sed -e 's/. as local scanner.*//' | tail -1 | sed -e 's/  */ /g' -e 's/^/Tenable Task /' | egrep . || echo Tenable Daily Tenable Scan missing
+
+	# See if the Tenable Agent is trashing during the last hour.
+	egrep $(date +%d/%b/%Y:%H -d "last hour" ) "$LOG" | egrep logdaily | sed 1,5d | ifne echo Tenable thrashing 
+
+else
+	echo Tenable not installed
+fi
+
+###############################################
+# BigFix
+
+# Check BigFix logs over the last day and a bit.
+LOGS=$(
+for w in yesterday now
+do
+	LOG=/var/opt/BESClient/__BESData/__Global/Logs/$(date +%Y%m%d.log -d "$w")
+	[ -f $LOG ] && echo $LOG
+done
+)
+
+if [ -n "$LOGS" ]
+then
+	#egrep -B 1 'Encrypted Report posted successfully' $LOG  | tail -2 | sed -e '1{s/^/BigFix Last Check In /; q}'
+	egrep -h 'Report posted successfully' $LOGS | tail -1 | sed -e 's/^[[:space:]]*/BigFix /'
+
+	# List the BigFix groups this client is in.
+	sed -n 's/^.*Successful Synchronization with site .//p' $LOGS | sed -e "s/' .*//" | sort | uniq | paste -s '-d;' | sed -e 's/;/; /g' | sed -e 's/^$/Missing Custom Group/' -e 's/^/BigFix Sites: /'
+else
+	:
+	#echo "BigFix no log"
+fi
+
+# Check that nothing is wrong.
+du -sh '/opt/tivoli' 2>/dev/null | egrep '[TG]' > /dev/null && echo "BigFix Large Tivoli cache"
+
+
+###############################################
+# Splunk
+DIR=/opt/splunkforwarder/var/log/splunk
+if [ -d "$DIR" ]
+then
+	# Version
+	sed -n -e 's/VERSION=/Splunk version /p' /opt/splunkforwarder/etc/splunk.version
+
+	# Is Splunk talking to the servers?
+	egrep 'group=per_source_thruput, series="/opt/splunkforwarder/var/log/splunk/metrics.log"' $DIR/metrics.log > /dev/null && 
+		echo Splunk reporting || echo Splunk not reporting
+	
+	# What is Splunk reporting on?
+	sed -n -e 's/", kbps=.*//' -e 's/.*Metrics - group=per_source_thruput, series="//p' $DIR/*.log |
+		sed -e 's!\(/var/log/httpd/\)[^/]*\(.log\)$!\1*\2!' |    # special handling of web logs
+   		sort | uniq |
+		egrep -v '^/opt/splunkforwarder/' | paste -d, -s | sed -e 's/,/, /g' |
+		sed -e 's/^$/no system logs./' |
+		sed -e 's/^/Splunk watching /'
+
+
+	# Permssions issues.
+	egrep $(date "+^%m-%d-%Y ") $DIR/splunkd.log | sed -n -e 's/.*error getting attributes of path "//p' | sed -e 's/".*//' | sort | uniq | ifne paste -d, -s | sed -e 's/^/Splunk Permission issues: /'
+fi
+
+exit 0

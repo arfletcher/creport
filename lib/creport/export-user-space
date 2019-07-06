@@ -1,0 +1,37 @@
+#!/bin/ksh
+
+# User data usage in the /export directories
+
+MAX=14
+#MAX=3
+
+for fs in ~(N)/export/*/*
+do
+	# Ignore some dirs
+	[[ "x$(basename $fs)" = xwaltz* ]] && continue
+	[ "people" = "$(basename $fs)" ] && continue
+	[ "lost+found" = "$(basename $fs)" ] && continue
+
+	# Audit
+	#find "$fs" -maxdepth 2 -printf '%u:%U:%s\n' | key-space | Paragraph "$h:$fs"
+	#find "$fs" -maxdepth 14 -printf '%u:%U:%s\n' | sed -e "s!^!$fs: !" | keyspace
+	#find "$fs" -maxdepth 14 -printf '%H: %u:%U:%s\n' | keyspace
+
+	#echo $fs ; continue
+
+	find "$fs" -maxdepth "$MAX" -printf '%H: %u:%U:%s\n' |
+		perl -slane 'if (s/(\d+)$//) { $total{$_} += $1;}; END { for my $k (sort keys %total) { print "$k$total{$k}"; }}' |
+		 perl -slane '
+		 BEGIN { 
+		  sub convert {
+		    my $size = shift;
+		    my @units = qw/B KB MB GB TB PB/;
+		    while (@units && $size > 1024) { shift @units; $size /= 1024; }
+		    sprintf("%.1f",$size) . $units[0];
+		  }
+		} 
+		s/(\d+)$/&convert($1)/e;
+		print;
+	'
+done
+

@@ -1,0 +1,108 @@
+#!/usr/bin/perl
+
+# Look for successful Globus transfers and report totals.
+# ARF 14 September 2017
+#
+
+# clush options
+##clushopt -Lq
+##clush -w @globus
+## groupby host
+
+use 5;
+use warnings;
+use strict;
+
+use Tie::IxHash;
+use Data::Dumper;
+use Time::Local;
+use POSIX;
+
+use PerlIO::gzip;
+
+#print &date2time('20170911132129'), "\n"; exit;
+
+#my $max = 2*7*24*3600;
+my $max = 24*3600; # max age
+
+# Default log files
+#@ARGV = sort glob('/var/log/gridftp.log') unless @ARGV;
+@ARGV = sort glob('/var/log/gridftp.log*') unless @ARGV;
+
+for my $f (@ARGV)
+{
+	# Handle gzip-ed log files
+	(open LOG, "<:gzip", $f ) || (open LOG, $f) || die "Cannot read file '$f' ($!)\n";
+
+	while (<LOG>)
+	{
+		# [8128] Fri Nov  3 19:07:30 2017 :: Transfer stats: DATE=20171103230730.295736 HOST=sioglobus.nhlbi.nih.gov PROG=globus-gridftp-server NL.EVNT=FTP_INFO START=20171103230730.022615 USER=oetjenka FILE=/data/hourigan/170526_J00139_0186_AHJY5NBBXX/Thumbnail_Images/L002/C111.1/s_2_2227_c.jpg BUFFER=367360 BLOCK=262144 NBYTES=37155 VOLUME=/ STREAMS=4 STRIPES=1 DEST=[128.231.2.243] TYPE=RETR CODE=226 TASKID=760d966a-c0e0-11e7-9493-22000a8cbd7d retrans=0,0,0,0
+
+		chomp;
+		if (s/^.*Transfer stats: //)
+		{
+			# Check format. Sometimes log lines get merged.
+			unless (/DATE=\d+\.\d+ HOST=\S+ .* START=\d+\.\d+ .* NBYTES=\d+ /)
+			{
+				#warn "Corrupt: $_\n";
+				next;
+			}
+
+			# Collect data from line.
+			tie my %data, 'Tie::IxHash';
+			s/\s+([^=\s]+=)/\n$1/g;
+			#warn $_;
+			%data = map { split(/\s*=\s*/,$_, 2); } split(/\n/, $_);
+
+			# sanitise NBYTES - corruption happens.
+			$data{NBYTES} =~ s/^(\d+)\s.*/$1/;
+
+			# Age....
+			my $date = date2time($data{DATE});
+			my $age = time() - $date;
+			#print "age $age $data{DATE}\n";
+			next unless ($age < $max);
+
+			# Augment
+			$data{LOG} = $f;
+			$data{WHEN} = POSIX::strftime('%e %b %Y %T', localtime($date));
+
+			# Work out duration and speed
+			$data{TIME} = $date - date2time($data{START});
+
+			my $speed = $data{NBYTES}/$data{TIME}/1024/1024;
+			$data{SPEED} = sprintf "%.2f MB/s %.2f Mb/s", $speed, ($speed*8);
+
+			for my $k (keys %data)
+			{
+				print "$k\t$data{$k}\n";
+			}
+			print "\n";
+
+			#die Dumper \%data;
+		}
+	}
+
+}
+
+
+sub date2time
+{
+	my ($dt) = @_;
+	#print "dt=$dt\n";
+
+	# YYYYMMDDhhmmss.ddddddd
+	$dt =~ s/[^\d\.]//g;
+	die unless ($dt =~ s/^(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)//);
+
+	#print join('-', ($6, $5, $4, $3, $2, $1)), "\n";
+	#my $t = timegm($6, $5, $4, $3, $2-1, $1);
+
+	my $t = timelocal($6, $5, $4, $3, $2-1, $1);
+	$t += $dt if (defined $dt);
+
+	#print "t=$t\n";
+
+	$t;
+}
+

@@ -1,0 +1,54 @@
+#!/bin/sh
+
+# Central Oracle JDK/JRE Status Report
+# 7 April 2015
+
+## Info 
+        #prefix2header -s ' *:' |
+        #paragraph -u "Oracle JDK/JRE Status" |
+	#titlesummary -P '@Oracle as default=java version .* \- Java'
+
+###########################################################
+
+# Payload
+
+#[ "x$(hostname -s)" = "xochre" ] && exit 0
+
+# Installed Oracle packages
+rpm -q jdk jre 2>/dev/null | egrep -v 'not installed'
+#dpkg-query -W jre jdk 2>/dev/null | sed -n -e 's/[[:space:]][[:space:]]*[^[:space:]].*//p'
+dpkg-query -W jre jdk 2>/dev/null | egrep '[[:space:]][^[:space:]]'
+
+locate -er '/bin/java$' | 
+	egrep -v '/waltz/' |
+	while read J
+do
+	[ ! -x "$J" ] && continue
+
+	# wrapped
+	file "$J" | egrep script > /dev/null && continue
+
+	# packaged
+	F=$(readlink -f "$J" )
+	if type rpm 2>/dev/null >/dev/null
+	then
+		rpm -qf "$F" | egrep 'is not owned by ' >/dev/null || continue
+	fi
+	if type dpkg 2>/dev/null >/dev/null
+	then
+		dpkg -S "$F" >/dev/null 2>&1 || continue
+	fi
+
+	echo "$J"
+done
+
+exit 0
+
+# Default versions
+{
+  java -version 2>&1 | egrep -v 'not found' | head -2 | sed 'N;s/\n/ - /'|awk '{print $1, $2, $3 ,$4, $5}'
+  javac -version 2>&1| egrep -v 'not found' | egrep -v 'line' | egrep -v 'IBM'
+} | sed -e 's/^/Default /'
+
+exit 0
+

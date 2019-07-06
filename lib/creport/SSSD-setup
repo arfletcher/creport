@@ -1,0 +1,75 @@
+#!/bin/ksh
+
+# Get an alert on each client configuration.
+
+# creport options
+## groupby results
+
+###### Payload ###############
+
+# List of systems to exclude.
+#[ ! -d /etc/sssd ] && echo Ignored && exit 0
+
+# SELinux
+sestatus 2>&1  | sed -n 's/Current mode:[[:space:]]*/SELinux /p'
+
+# Flag this setting.
+getsebool use_nfs_home_dirs | egrep off
+
+# User lookup?
+id ckw 2>&1 | egrep 'No such test user'
+
+# Check SSSD
+if type systemctl >/dev/null 2>&1 
+then
+	systemctl is-enabled sssd.service | egrep disabled | sed -e 's/^/SSSD /'
+else
+	chkconfig sssd --list | egrep 3:off > /dev/null && echo "SSSD disabled"
+fi
+
+
+# Which LDAP is it using?
+sed -n -e 's/^ldap_uri[[:space:]]*=[[:space:]]*/SSSD LDAP /p' /etc/sssd/sssd.conf
+
+##############################
+# PAM
+cd /etc/pam.d || exit
+
+check () {
+	report=echo
+	if [ $# != 0 -a "x$1" = "x-q" ]
+	then
+		shift
+		report=true
+	fi
+
+	for f
+	do
+		egrep -q '^account.*required.*pam_access.so' $f && continue
+
+		$report Missing pam_access line in $f
+	done
+}
+
+case "$(lsb_release -si)" in
+	Debian) check -q common-account || check sshd ;;
+	Ubuntu) check -q common-account || check sshd ;;
+	*) check  system*-auth ;;
+esac
+
+###################################
+# access.conf
+FILE=/etc/security/access.conf
+
+[ -f "$FILE" ] || error No access file "$FILE"
+
+# Check for a deny all line.....
+# It should be at the end of the file... but it needs to be there somewhere.
+grep -P -q "^\s*\-\s*:\s*ALL\s*:\s*ALL\s*$" $FILE || echo Missing catch-all deny
+
+for U in root
+do
+	grep -P -q "\s*\+\s*:\s*$U\s*:\s*ALL\s*$" $FILE && continue
+	echo ERROR: missing user $U in $FILE
+done
+

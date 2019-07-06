@@ -1,0 +1,28 @@
+#! /bin/sh
+
+# Check the APC UPSes
+#  . find an USB UPSes
+#  . report any apcuspd statuses
+#
+# ARF 08 August 2014
+# ARF 03 November 2018
+
+## clushopt -LNq
+## post stanza2tab 'HOST STATUS CABLE BATTDATE LOADPCT' | column -t
+
+# Payload
+
+# Look to see if there is a UPS attaced via USB
+lsusb | egrep Uninterruptible > /dev/null || exit 0
+
+# Report status
+echo HOST	$(hostname -s)
+apcaccess 2>/dev/null | 
+	sed -e 's/[[:space:]]*:[[:space:]]*/	/' -e 's/[[:space:]]Percent/%/gi' -e 's/ Cable//' -e 's/Custom //' -e 's/[[:space:]]*$//' -e 's/ /,/g' |
+	egrep '^(HOST|STATUS|CABLE|BATTDATE|LOADPCT)[[:space:]]'
+
+# Finish the stanza
+echo
+
+exit
+

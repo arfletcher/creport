@@ -1,0 +1,14 @@
+#!/bin/ksh
+
+# A list of systems with bridges and unenforced FORWARD rules.
+
+## errors hide
+
+type brctl >/dev/null 2>&1 && brctl show |
+	sed 1d |
+	egrep -v "^(virbr|cni)" |
+	ifne sysctl net.bridge.bridge-nf-call-iptables net.bridge.bridge-nf-call-ip6tables 2>&1 | egrep -v "= 1$"
+
+exit 0
+
+

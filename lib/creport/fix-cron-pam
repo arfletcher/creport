@@ -1,0 +1,27 @@
+#!/bin/ksh
+
+## Fix the PAM files to allow cron to actually run!
+
+# It's a PAM bug that crept into RHEL 7 that Red Hat won't fix.
+# The fix is to explicitly allow root to run cron jobs.
+#
+# ARF July 2019
+
+#  Jun 16 18:01:02 c7 crond[30994]: FAILED to authorize.....
+HOST=$(hostname -s)
+DATE=$(date "+%b %e %H:..:.. $HOST")
+
+# Only a CentOS/RHEL issue
+lsb_release -d | ! egrep 'CentOS|Red Hat' > /dev/null && exit
+
+# Is it broken on this host?
+egrep "^$DATE" /var/log/cron | ! egrep 'FAILED to authorize' > /dev/null && exit
+
+# Has it been fixed recently?
+egrep pam_rootok /etc/pam.d/crond > /dev/null && echo Already fixed && exit
+
+# Fix it
+sed -i.dist -e '1i#Fix cron for root - ARF \
+auth     sufficient      pam_rootok.so' /etc/pam.d/crond
+echo "fixed cron's PAM file."
+

@@ -1,0 +1,172 @@
+#! /usr/bin/perl
+
+# On machines that are running mysqld, change the mysql root password
+# with a random string and update the .my.cnf file. Attempt to be
+# conservative when changing the password.
+#
+# Usage: $0 [-v]
+#
+
+# use mysql;
+# update user set password=PASSWORD("NEWPASSWORD") where User='root';
+# flush privileges;
+# quit
+
+# ARF 8 Aug 2012
+#
+## clushopt -x ochre
+## errors show
+
+use 5;
+use warnings;
+use strict;
+
+use Data::Dumper;
+use File::Spec;
+use POSIX;
+
+# Locate config file and section
+my $cnf		= File::Spec->catfile($ENV{HOME}, '.my.cnf');
+my $group	= 'client';
+my $copy	= '/etc/my.cnf.root';
+my $uidlimit	= 1000;
+
+# Verbose?
+sub verbose { 1; }
+if (@ARGV && ($ARGV[0] eq '-v')) { shift; no warnings; eval 'sub verbose { print @_; }'; }
+
+our @missing = grep( !eval "use $_; 1", qw (
+	Proc::ProcessTable
+)) and die 
+	"Please install CPAN modules: cpan -i @missing\n",
+	"Perhaps yum -y install ", join(' ', map( {s/::/-/g; s/^/perl-/; $_; } @missing)),
+	"\n",
+	"Perhaps apt-get -y install libproc-processtable-perl",
+	"\n";
+
+# Get the UID for mysql user
+#my $mysqluid   = getpwnam('mysql');
+#die "No mysql user\n" unless (defined $mysqluid);
+
+# Count mysqld processes... if there are none then just quit!
+my $p = new Proc::ProcessTable( 'cache_ttys' => 1 );
+my $procs = 0;
+for my $ps (@{$p->table})
+{
+	next unless defined $ps->{exec};
+	#next unless ($ps->{uid} == 0 || $ps->{uid} == $mysqluid);
+	next unless ($ps->{uid} < $uidlimit);
+
+	$procs ++ if ($ps->{exec} =~ /mysqld/);
+}
+exit unless ($procs>0);
+
+verbose "mysqld $procs procs running\n";
+
+# Look for .my.cnf file
+die "No such file $cnf\n" unless (-f $cnf);
+die "Cannot read $cnf\n" unless (-r $cnf);
+
+#die "Bye!\n";
+verbose "using $cnf\n";
+
+# Check for modules.
+@missing = grep( !eval "use $_; 1", qw (
+	DBD::mysql
+	Config::IniFiles
+)) and die "Please install CPAN modules: cpan -i @missing\n", "Perhaps yum -y install ", join(' ', map( {s/::/-/g; s/^/perl-/; $_; } @missing)), "\n";
+
+# Load config file.
+my $cfg	= Config::IniFiles->new( -file => $cnf) || die "Cannot read $cnf\n";
+
+# Load defaults
+my $passwd	= &set($group, 'password' , 'xxxx');
+my $user	= &set($group, 'user' , 'root');
+my $port	= &set($group, 'port' , 3306);
+my $hostname	= &set($group, 'hostname' , 'localhost');
+
+verbose "Read config file ($user\@$hostname:$port)\n";
+##verbose "password=$passwd\n";
+
+# Generate new random, long password.
+my $new		= join('', map { ("a".."z", "A".."Z", 0..9, '!', '*', '$')[rand 65] } 1..20);
+
+# Sanity check
+die "Generated passwd is the same as before!\n" if ($passwd eq $new);
+
+# Connect to database instance
+my $dsn = "DBI:mysql:database=mysql;host=$hostname;port=$port";
+my $dbh = DBI->connect($dsn, $user, $passwd);
+die $@ if $@;
+die $@ unless $dbh;
+verbose "Connected to database.\n";
+
+#$dbh->do("show databases;");
+#my $sth = $dbh->prepare("select * from user where User='$user'");
+#$sth->execute();
+#my $row = $sth->fetchrow_hashref();
+#print Dumper($row);
+
+# Before the password is changed, update the config file
+# Actually should use InitFiles module to change this file rather than
+# just rewriting it.
+my $count = 0;
+{
+	local $^I = '.' . time(); # keep a backup
+	local @ARGV = ( $cnf );
+
+	while (<>)
+	{
+		#verbose $_;
+
+		my $oldline = $_;
+		if (s/(password\s*\=\s*\"?)\Q$passwd\E(\"?.*)$/$1$new$2/)
+		{
+			$count ++;
+			print "# $oldline";
+		}
+		print;
+	}
+}
+
+# Check.
+#print "Config file $cnf not changed!\n" unless ($count > 0);
+die "Config file $cnf not changed!\n" unless ($count > 0);
+verbose "Changed file $cnf\n";
+
+# Change password in database.
+my $rows;
+eval {
+	$rows = $dbh->do("update user set password=PASSWORD('$new') where User='$user'");
+};
+die "password change for '$user' failed: $@\n" if $@;
+die "password change for '$user' failed\n" unless ($rows > 0);
+
+$dbh->do('FLUSH PRIVILEGES');
+verbose "Changed database\n";
+
+# Success.
+print "password for $user\@$hostname:$port and $cnf changed at ", POSIX::strftime('%Y-%m-%d %T', localtime()), "\n";
+
+# Copy to a file accessible by a select few
+# Bodge.
+if ( -f $copy )
+{
+	umask 0266;
+	system '/bin/cp', $cnf, $copy;
+}
+
+exit;
+
+# Get info from the ini file.
+sub set
+{
+	my ($group, $var, $default) = @_;
+	my $val = $cfg->val( $group, $var);
+	return $default unless defined $val;
+
+	$val =~ s/^"// && $val =~ s/"$//;
+
+	$val;
+}
+

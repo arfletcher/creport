@@ -1,0 +1,48 @@
+#!/bin/ksh
+
+# Report about systems with encrypted root discs
+
+##clushopt -a
+##groupby results
+## errors hide
+
+# List of systems to exclude.
+[[ $(lsb_release -sir) = CentOS\ 5.* ]] && exit 0
+
+
+# Ignore VMs
+[ ! $(virt-what 2>/dev/null ) = "" ] && exit 0
+
+# CentOS/RHEL 6 - out of scope
+lsb_release -sir | egrep 'CentOS 6\.' > /dev/null && echo RHEL/CentOS 6 && exit 0
+lsb_release -sir | egrep 'RedHatEnterprise.* 6\.' > /dev/null && echo RHEL/CentOS 6 && exit 0
+
+# Find the device containing root.
+DEV=$(
+	lsblk -psan 2>/dev/null | egrep -A5 '/$' | egrep -v mapper | head -1 | sed -e 's/^ *..//' -e 's/ .*//'
+)
+[ -z "$DEV" ] && echo Cannot find root device && exit
+
+# Look at all the root devices....
+for d in $DEV
+do
+	# Is it encrypted
+	! cryptsetup isLuks "$d" 2>/dev/null && echo Not encrypted && continue
+	#echo Encrypted
+
+	# Clevis-ed?
+	! type luksmeta > /dev/null 2>&1 && echo Clevis not installed && continue
+	! luksmeta test -d $d && echo Clevis not enabled && continue
+
+	# Which server?
+	luksmeta -d $d show | egrep -v inactive | egrep -v empty | while read slot state uuid
+	do
+		luksmeta load -d $d -s "$slot" |
+		base64 -d 2>/dev/null |
+		sed -e 's/^.*url":"//' -e 's/".*/\n/' -e 's/^/Clevis URL /'
+	done | egrep . && continue
+
+	echo Unknown status
+
+done | sort | uniq
+

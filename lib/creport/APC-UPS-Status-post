@@ -1,0 +1,13 @@
+#! /bin/ksh
+
+titlesummary \
+	@ONLINE \
+	-REPLACEBATT \
+	-NOBATT \
+	-ONBATT \
+	-LOWBATT \
+	-OVERLOAD \
+	'-SHUTTING DOWN' \
+	-COMMLOST \
+	'-unckecked=^\S+$'
+

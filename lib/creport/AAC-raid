@@ -1,0 +1,22 @@
+#! /bin/ksh
+
+##clushopt -Lq
+##groupby host
+
+PATH=/usr/StorMan:$PATH
+
+# Sanity check
+type arcconf 2>/dev/null 1>&2 || exit 0
+
+#header () { echo "$@"; echo "$@" | sed -e 's/./-/g'; }
+#header $(uname -n )
+
+# RUn through 'all' the controllers
+for i in $(seq 1 10)
+do
+	#echo Controller $i
+	arcconf getconfig $i al | sed -e "s/^/$i/" | egrep 'r Status|Defunct|Degraded|  State   |S.M.A.R.T. warn' || break
+	echo
+done
+
+

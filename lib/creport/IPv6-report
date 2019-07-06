@@ -1,0 +1,39 @@
+#!/bin/ksh
+
+# report about IPv6 address status from each system.
+# Lauch via
+#   creport ipv6-report
+
+## clush -w @NIHnet
+## groupby results
+
+PATH=/usr/sbin:/sbin:$PATH
+
+#[[ $(lsb_release -sir) = CentOS\ 5.* ]] && exit 0
+lsb_release -sir | egrep 'CentOS 5.' >/dev/null && exit 0
+
+# Do we have an NIH address?
+ip -o -6 a | egrep 2607: >/dev/null || echo No NIH IPv6 address
+
+# Floating address?
+ip -o -6 a | egrep '::20[12]:[0-9a-f]*/' >/dev/null && echo Floating IPv6 Addresses
+
+# Is it an unhappy address? Only look for DHCPv6 assigned ones
+ip -o a | egrep '2607:.*::' | egrep ' (deprecated |preferred_lft 0)' >/dev/null &&  echo Deprecated assigned lease
+
+# DHCP client?
+ps -eo cmd | egrep '^[a-z/]*dhclient.* -6 ' >/dev/null || echo No IPv6 DHCP client
+
+# Check the DNS
+host -t aaaa $(hostname -f) 2>&1 | egrep 'has IPv6 address' >/dev/null || echo No AAAA record
+
+# Add this along for the ride
+egrep nameserver /etc/resolv.conf >/dev/null || echo No namesevers
+hostname | egrep nih.gov >/dev/null || echo Missing domain in hostname
+
+# Check we can talk to the outside world.
+# This can hang and/or produce lots of messages during failures.
+ip -o -6 a | egrep 2607: >/dev/null && type fping6 >/dev/null && timeout 10 fping6 helix.nih.gov 2>&1 | egrep -v error | sed -e 's/://g' | sort | uniq | egrep .
+
+exit 0
+

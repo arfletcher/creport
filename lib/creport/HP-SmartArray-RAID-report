@@ -1,0 +1,14 @@
+#!/bin/ksh
+
+# Central HP SmartArray RAID report
+# rothmb 20150410
+# arf 03 November 2018
+
+##clushopt -Lq
+##Groupby host
+
+[ -x /usr/sbin/hpacucli ] && /usr/sbin/hpacucli ctrl all show config
+
+exit 0;
+
+

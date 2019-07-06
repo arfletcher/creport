@@ -1,0 +1,19 @@
+#!/bin/ksh
+
+# Post filter for report
+
+	titlesummary \
+		'@JBOD' \
+		'-@Failed' \
+		'@Online' \
+		'@Hotspare=Hot\s*spare' \
+		'@$1 Unconfigured Disc=Slot.*Unconfigured\(([^)]+)\)' \
+		'@Unconfigured Disc=Unconfigured' \
+		'@Rebuild' \
+		'@Copyback' \
+		'@State\s+:\s\K(\S+)' \
+		'-@missing package=need MegaRAID package' \
+		'-Warning=Slot.*\- ((?!Online|JBOD|Hot\s*spare|Unconfigured).*)$' \
+		'-State\s+:\s\K((?!Optimal).)*$' \
+		'-@badslot=Slot.*\Kbad' \
+

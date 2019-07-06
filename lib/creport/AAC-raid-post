@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# Central AAC RAID card report
+# ARF 15 Aug 2013
+
+titlesummary \
+	'@Disc=State' \
+	'@Online' \
+	'-Defunct=Defunct.*: [1-9]\d*$'  \
+	'-warnings=S.M.A.R.T.*: [1-9]\d*$'
+

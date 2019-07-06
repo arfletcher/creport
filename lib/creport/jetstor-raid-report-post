@@ -1,0 +1,20 @@
+#!/bin/sh
+
+# Look for JetStor RAIDs and report their status.
+# ARF 07 November 2014
+
+# NB the regexp
+#	\)\s+((?!Normal).)*\s[\d\.]+GB$
+# matches a ) that is not followed by "Normal".
+
+titlesummary \
+	'-Warning=\)\s+((?!Normal).)*\s[\d\.]+GB$' \
+	'@Raid Set=GB$' \
+	'@Volume=(?i)(Vol|JetStorB|jetstor0)' \
+	@Normal \
+	'@Rebuilding=\)\s+Rebuilding' \
+	'-Failure=Failed' \
+	'@Degraded=Degraded' \
+	'@Being checked=Checking' \
+	'@Failure=Failed' \
+

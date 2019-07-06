@@ -1,0 +1,37 @@
+#! /bin/ksh
+
+# list users that are not allowed to use 'cron' or 'at'.
+#    Anthony Fletcher 29 September 2010
+#    Anthony Fletcher 11 September 2014 reworked
+
+##info List of users that are not allowed to use cron/at
+## errors hide
+
+PATH=/usr/local/sbin:$PATH
+
+ATQ () { type atq >/dev/null 2>&1 || return; atq | sed -e 's/^.* //' | sort | uniq; }
+
+# Search for crontab entries.
+if [ -f /etc/cron.allow ]
+then
+	# Deal with spaces in /etc/cron.allow
+	for cron in /var/spool/cron/tabs /var/spool/cron/crontabs /var/spool/cron
+	do
+		[ -d "$cron" ] || continue
+		ls "$cron"
+		break
+	done | while read U 
+	do
+		egrep "^[[:space:]]*$U[[:space:]]*\$" /etc/cron.allow >/dev/null || echo "$U has a crontab file but is not allowed by /etc/cron.allow."
+	done
+fi
+
+if [ -f /etc/at.allow ]
+then
+	ATQ | while read U
+	do
+		egrep "^[[:space:]]*$U[[:space:]]*\$" /etc/at.allow >/dev/null || echo "$U has a at job but is not allowed by /etc/at.allow."
+	done
+fi
+
+

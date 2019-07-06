@@ -1,0 +1,23 @@
+#!/bin/ksh 
+
+# Report on firewall disfunction.
+
+# creport options.
+## errors hide
+## groupby results
+
+
+# Handle Debian testing which uses ip*tables-legacy-save
+SAVE4=iptables-save
+SAVE6=ip6tables-save
+
+# ufw installed on Charles' systems, don't worry about iptables-legacy
+#type iptables-legacy-save >/dev/null 2>&1  && SAVE4=iptables-legacy-save
+# type ip6tables-legacy-save >/dev/null 2>&1 && SAVE6=ip6tables-legacy-save
+
+# Look for any DENY or REJECT rules.
+$SAVE4 -t filter  | egrep 'DENY|REJECT' >/dev/null || echo iptables not running
+$SAVE6 -t filter | egrep 'DENY|REJECT' >/dev/null || echo ip6tables not running
+
+exit 0
+

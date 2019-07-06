@@ -1,0 +1,21 @@
+#!/bin/ksh
+
+# Locate wordpress installed and alert to old versions
+
+## clushopt -Lq
+## errors hide
+## groupby host
+## post ignore-uptodate-wordpress
+
+# Installed Wordpress versions.
+locate -e /wp-includes/version.php | while read f
+do
+	# Assumption is that the current version is the first in the file
+        V=$(sed -n -e 's/^\$wp_version = .//p' "$f" | sed -e "s/';//" | head -1)
+	[ -z "$V" ] && V=-
+
+	U=$(stat -c %U "$f")
+
+	printf '%6s %10s %s\n' $V $U "$f"
+done
+

@@ -1,0 +1,26 @@
+#!/bin/ksh
+
+# Post process the wordpress version script thowing away those that are
+# up to date.
+#
+# Used with "creport old-wordpress-versions" 
+
+VERS=/var/lib/misc/wordpress-curent-versions
+
+# Find the most recent wordpress versions
+
+# Dont update the versions more that once a day because they lock us out
+if [ ! -f "$VERS" ] || [ "$(stat -c %Y "$VERS" )" -lt $(date +%s -d 'yesterday') ]
+then
+	# Cache file is non existant or old.
+	{
+	# Wordpress versions.
+	curl -s https://wordpress.org/download/ | sed -n -e 's/.*Download WordPress \([0-9]\)/\1/p' | sed -e 's/[[:space:]].*//'
+	} | sed -e 's/^/\\b/' -e 's/$/\\b/' > "$VERS"
+fi
+
+V=$(cat "$VERS" | sed -e 's/\\b//g' | ifne paste -d, -s)
+
+# Exclude the recent versions from STDIN
+egrep -v -f "$VERS" | sed -e "1i CURRENT $V"
+

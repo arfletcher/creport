@@ -1,0 +1,37 @@
+#!/bin/ksh
+
+# Locate Drupal installed and alert to old versions
+
+## clushopt -Lq
+## errors hide
+## groupby host
+### post egrep -v ':\s*7\.63\s'
+### post egrep -v ':\s*8\.6\.7\s'
+## post ignore-uptodate-drupal
+
+# OK versions....
+#VERSIONS="7.63 8.6.7"
+#VERSION7=$(w3m -dump https://www.drupal.org/project/drupal/releases?api_version%5B%5D=103 | sed -n -e 's/^drupal //p' | head -1)
+#VERSION8=$(w3m -dump https://www.drupal.org/project/drupal/releases?api_version%5B%5D=7234 | sed -n -e 's/^drupal //p' | head -1)
+# NB the 8.5.x series is EOL May 2019
+#OKMATCH=$(echo $VERSIONS | sed -e 's/  */|/g')
+
+# Look for local versions
+locate -er '/includes/bootstrap.inc$' | egrep '^/public/' | while read f
+do
+	# Which version....
+	# Look for: define('VERSION', '7.63');
+	V=$(sed -n -e 's/.);//' -e 's/.*define(.VERSION., .//p' "$f")
+
+	# Not Drupal perhaps?
+	[ -z "$V" ] && continue
+
+	U=$(stat -c %U "$f")
+
+	printf '%6s %10s %s\n' $V $U "$f"
+	#echo "$V	$U $f"
+
+	# Not the latest?
+	#echo "$V" | egrep -v -x "($OKMATCH)" | sed -e "s!\$!	$f!"
+done 
+

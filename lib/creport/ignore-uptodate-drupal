@@ -1,0 +1,29 @@
+#!/bin/ksh
+
+# Post process the drupal version script thowing away those that are
+# up to date.
+#
+# Used with "creport old-drupal-versions" 
+
+VERS=/var/lib/misc/drupal-curent-versions
+
+# Find the most recent Drupal versions
+
+# Dont update the versions more that once a day because they lock us out
+if [ ! -f "$VERS" ] || [ "$(stat -c %Y "$VERS" )" -lt $(date +%s -d 'yesterday') ] || [ ! -s "$VERS" ]
+then
+	# Cache file is non existant or old.
+	for url in 'https://www.drupal.org/project/drupal/releases?api_version%5B%5D=103' 'https://www.drupal.org/project/drupal/releases?api_version%5B%5D=7234' 
+	do
+		curl -sk "$url" | w3m -dump -T text/html |  sed -n -e 's/^drupal //p' | head -1
+	done  | sed -e 's/^/\\b/' -e 's/$/\\b/' > "$VERS"
+
+	#cat $VERS
+fi
+
+V=$(cat "$VERS" | sed -e 's/\\b//g' | ifne paste -d, -s)
+
+# Exclude the recent versions from STDIN
+egrep -v -f "$VERS" | sed -e "1i CURRENT $V"
+
+

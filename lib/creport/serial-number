@@ -1,0 +1,70 @@
+#!/bin/ksh
+
+# Show the serial number for a machine.
+#
+# Usage: serialnumber
+#
+# First check the file /etc/SerialNumber
+# otherwise try dmidecode and then lshw.
+#
+# 		ARF 26 Oct 2009.
+
+#creport options
+## post stanza2tab | sed -e 's/ /_/g' | column -t -s '	'
+## clushopt -NLq
+
+# Alternative: cat serial-number|  clush -NLq -w @R1 ksh
+
+# Payload
+echo "Host	$(hostname -s)"
+echo -n "SerialNumber	"
+
+trap 'echo' 0
+
+# Look at the staic file for hosts with incorrect BIOS info..
+SN=/etc/SerialNumber
+[ -f "$SN" ] && cat "$SN" && exit
+
+# For VMs use the KVM UUID
+if type virt-what >/dev/null 2>&1
+then
+	if [ "x$(virt-what)" = "xkvm" ]
+	then
+		dmidecode -s system-uuid
+		exit
+	fi
+fi
+
+# Try SM IPMI
+if type ipmicfg >/dev/null 2>&1
+then
+	# Needed on cake, which core dumps.
+	case "$(hostname -s)" in 
+		cake) ;;
+		yak) ;;
+		riga) ;;
+		flagon) ;;
+		vessel) ;;
+		livre) ;;
+		cardiff) ;;
+		warsaw) ;;
+
+		*)
+
+		#if ksh -c 'ipmicfg -fru BS;exit' >/dev/null 2>&1
+		if ipmicfg -fru PS >/dev/null 2>&1
+		then
+			ipmicfg -fru PS | tr -d ' ' | egrep . && exit
+			ipmicfg -fru BS | tr -d ' ' | egrep . && exit
+		fi
+	;;
+	esac
+fi
+
+# Look at the BIOS
+type dmidecode >/dev/null 2>&1 && dmidecode -s system-serial-number && exit
+type lshw >/dev/null 2>&1 && { lshw 2>/dev/null | sed -n -e 's/^  *serial: //p' | head -1; exit; }
+
+# Oh well.
+echo unknown
+

@@ -1,0 +1,264 @@
+#!/bin/ksh
+
+# Get a report from multiple hosts using a individual script
+# distributed via clush.
+#
+# ARF November 2018
+
+USAGE="$0 <options> <single-host-script> [<clush options>]
+
+Options:
+	-h          Help message
+
+	-S <dir>    Use this script path
+	-I <info>   Extra display information
+	-T <title>  Set title for report
+	-c          Run the specified command instead of a scriptlet
+	-n          Noop mode
+
+	-M          Send report via email to \$MAILTO, or \$USER.
+
+	Error display
+	-E          Don't report any script error messages
+	-e          Do report any script error messages (default)
+
+	Reporting options
+	-C	    Group the results by host
+	-R	    Group the hosts by report output
+
+	Clush options:
+	-L         disable header block and order output by nodes
+	-b         display gathered results
+	-B         display gathered results
+	-N         disable labeling of command line
+	-q         quiet clush output
+
+	-P <num>   same as --pick=<num>
+
+	Clush targets:
+	-a         Run on all nodes
+	-w <nodes> Specified clush nodelist
+	-x <nodes> Exclude these nodes
+
+Default information can be added via 
+##Info .....
+
+Default clush options can be specifiedin the script via
+##clushopt <options>
+
+Default clush targets can be specifiedin the script via
+##clush [-w <...>] [-x <...>] [-a]
+
+Post processing containing in script:
+##post <shell command>
+
+Show errors via
+## errors show
+## errors
+## errors hide
+
+Post processing for results can be found in a script named
+	<single-host-script>-post
+Also can be set via
+##POST <shell command>
+
+Invocation: $0 $@
+"
+
+# Defaults
+collect=
+info () { cat; }
+SPATH=$(readlink -f $(dirname $(which $0) )/../lib/creport)
+OUT() { cat; }
+TITLE=
+CLUSHOPT=
+CLUSHTARGETS=
+SHELLCMD=
+iscmd=
+GROUPBY=
+PAYLOAD=/dev/null
+POSTCMD=
+POST=
+showerrors=
+noop=
+INFO=
+
+DEFAULTCLUSHTARGETS="-a"
+
+# Load system defaults
+RC=/etc/creport
+[ -f "$RC" ] && . "$RC"
+
+
+#NB The 'sort' command sorts differently depending on the LANG and LC_ALL env vars
+#   This will cause some grouped results to oddly split apart!
+unset LANG LC_ALL LC_COLLATE
+
+# Set recipiant if we are not run in a terminal.
+: ${MAILTO:=$LOGNAME}
+: ${MAILTO:=$USER}
+
+# Initialise
+ARGS=
+groupbyresult () { sed -e 's/^\([^:]*\): \(.*\)/\2:::: \1/' | sort | prefix2header -n -u -s '::::\s+' | fmt ; }
+groupbyhost   () { prefixsort | prefix2header; }
+Paragraph () { sed -e "1i$1" | sed -e "1{p;s/./-/g};2,\$s/^/  /" -e '$a\\'; }
+
+
+# If not in a terminal, deliver report via email
+#[ ! -t 0 ] && OUT() { subjectise -t "$MAILTO" | ifne sendmail -t; }
+
+# Parse command line.
+while getopts ":hnI:T:cS:eERCaw:x:LBbqNMP:" optchar
+do
+	#echo "option $optchar"
+	case "$optchar" in
+                h)  echo "$USAGE" && exit 0 ;;
+
+		n)  noop=echo ;;
+
+		I)  INFO="$OPTARG" ;;
+		T)  TITLE="$OPTARG" ;;
+		c)  iscmd=1 ;;
+		S)  SPATH="$OPTARG" ;;
+
+		e)  showerrors=show ;;
+		E)  showerrors= ;;
+
+		R)  GROUPBY=results ;;
+		C)  GROUPBY=host ;;
+
+		M)  OUT() { subjectise -t "$MAILTO" | ifne sendmail -t; } ;;
+
+		[LbBqB])  CLUSHOPT="$CLUSHOPT -$optchar" ;;
+		P)  CLUSHOPT="$CLUSHOPT --pick=$OPTARG" ;;
+
+		a)     CLUSHTARGETS="$CLUSHTARGETS -$optchar" ;;
+		[wx])  CLUSHTARGETS="$CLUSHTARGETS -$optchar $(echo $OPTARG | sed -e 's/ /,/g')" ;;
+
+		\?) echo "$0: unknown option '-$OPTARG'"; return ;;
+		\:) echo "$0: missing value for '-$OPTARG'"; return ;;
+		*)  echo "$0: odd option '-$optchar'"; return ;;
+	esac
+done
+# Lose all the options.
+shift $(($OPTIND - 1))
+
+# Add scriptlet path to search PATH
+[ -z "$SPATH" ]   && echo "Script path empty!"          && exit 1
+[ ! -d "$SPATH" ] && echo "Script path does not exist!" && exit 1
+PATH=$SPATH:$PATH
+
+# usage
+[ -z "$SHELLCMD" -a $# = 0 ] && echo "$USAGE" && ls "$SPATH" && exit 1
+
+# Report title, based on script name.
+
+if [ -z "$iscmd" ]
+then
+	# Which report?
+	PAYLOAD=$(which $1 2>/dev/null)
+	[ -z "$PAYLOAD" ] && echo "No such report as '$1'" && exit 1
+
+	# What is the "shell" for the script?
+	SHELLCMD=$(sed -e '1 { s/^#!//;q}' "$PAYLOAD")
+	[ -z "$SHELLCMD" ] && SHELLCMD=/bin/ksh
+
+	# Find the post processing script.
+	POST="${PAYLOAD}-post"
+	[ ! -x "$POST" ] && POST=
+
+	# Default options from payload.
+	[ -z "$TITLE" ]        && TITLE=$(sed -n -e 's/^##[[:space:]]*title[[:space:]]//ip' "$PAYLOAD")
+	[ -z "$INFO" ]         && INFO=$(sed -n -e 's/^##[[:space:]]*info[[:space:]]//ip' "$PAYLOAD")
+	[ -z "$CLUSHTARGETS" ] && CLUSHTARGETS=$(sed -n -e 's/^##[[:space:]]*clush[[:space:]]//ip' "$PAYLOAD")
+	[ -z "$CLUSHOPT" ]     && CLUSHOPT=$(sed -n -e 's/^##[[:space:]]*clushopt[[:space:]]//ip' "$PAYLOAD")
+	[ -z "$GROUPBY" ]      && GROUPBY=$(sed -n -e 's/^##[[:space:]]*groupby[[:space:]]//ip' "$PAYLOAD")
+	[ -z "$showerrors" ]   && showerrors=$(sed -n -e 's/^##[[:space:]]*errors[[:space:]][[:space:]]*//ip' "$PAYLOAD" | tr A-Z a-z )
+	[ -z "$POSTCMD" ]      && POSTCMD=$(sed -n -e 's/^##[[:space:]]*post[[:space:]]//p' "$PAYLOAD" | paste -d\| -s)
+	[ -z "$POST" ]         && POST=$(sed -n -e 's/^##[[:space:]]*POST[[:space:]]//p' "$PAYLOAD")
+
+	# Set TITLE if not already set.
+	#[ -z "$TITLE" ] && TITLE=$(basename $1 | sed -e 's/-/ /g' -e 's/\b\(.\)/\u\1/g'  )
+	[ -z "$TITLE" ] && TITLE=$(basename $1 | sed -e 's/-\(.\)/ \u\1/g' -e 's/^./\u&/'  )
+
+	shift;
+
+	# Deal with script arguments.
+	ARGS=
+	case "$SHELLCMD" in
+		*sh*)	ARGS="set -- $@" ;;
+		*perl*)	
+			for a
+			do
+				ARGS="$ARGS '$a'," 
+			done
+			ARGS="\$0='${PAYLOAD}'; @ARGV=($ARGS);"
+		;;
+
+		*python*)
+			for a
+			do
+				ARGS="$ARGS, '$a'" 
+			done
+			ARGS="import sys; sys.argv = ('${PAYLOAD}' $ARGS);"
+		;;
+		*) echo "Don't know how to deliver argumments for $SHELLCMD" >&2 ;;
+	esac
+else
+	# It's just a straight command
+	SHELLCMD="$@"
+fi
+
+#Set the default for showerrors
+[ -z "$showerrors" ] && showerrors=show
+
+# If the TITLE is just a dash, don't add a TITLE.
+[ "x-" = "x$TITLE" ] && Paragraph () { cat; }
+
+# How to group the results in the final output.
+if [ -z "$collect" ]
+then
+	case "$GROUPBY" in
+		host*)   collect=groupbyhost;;
+		result*) collect=groupbyresult;;
+		*)       collect=cat ;;
+	esac
+fi
+
+[ -z "$POSTCMD" ] && POSTCMD=cat
+eval "postcmd () { $POSTCMD; }"
+
+[ -z "$POST" ] && POST=cat
+eval "POST () { $POST; }"
+
+[ ! -z "$INFO" ] && info () { sed -e "1i$INFO\\n"; }
+
+[ -z "$TITLE" ] && TITLE=Report
+[ -z "$CLUSHTARGETS" ] && CLUSHTARGETS="$DEFAULTCLUSHTARGETS"
+
+# Remaining args are for the script 
+#echo args: $# $@
+
+# Error reporting.
+ERRORS=$(mktemp)
+trap '/bin/rm -f "$ERRORS"' 0
+
+# Run the report everywhere
+{
+	#[ ! -z "$noop" ] && echo clush $CLUSHOPT "$@" -- $SHELLCMD $@
+	echo "$ARGS" |
+	cat - "$PAYLOAD" | 
+		$noop clush $CLUSHOPT $CLUSHTARGETS -- $SHELLCMD 2>"$ERRORS" |
+		postcmd | 
+		$collect
+
+	[ "x$showerrors" = "xshow" ] && cat "$ERRORS" | sed -e "1i\\\nErrors"  -e 's/^/  /'
+} |
+	info |
+	Paragraph "$TITLE" |
+	#tee /tmp/QQWWEE |
+	POST |
+	#tee /tmp/QQWWEE |
+	OUT
+

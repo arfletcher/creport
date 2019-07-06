@@ -1,0 +1,80 @@
+#! /bin/ksh
+
+# Check the dates of the latest waltz backups.
+
+# creport options
+##clushopt -N
+##post daysold | sort -rn | column -t
+## errors show
+
+PATH=/usr/bin:/bin
+PATH=/usr/sbin:/sbin:$PATH
+PATH=/usr/local/bin:$PATH
+PATH=/usr/local/sbin:$PATH
+
+SHORT=$(hostname -s)
+FQDN=$(hostname -f)
+MINAGE=0
+filter () { cat; }
+
+# Parse command line
+USAGE="USAGE: $0 [<options>] [<filter>]
+
+List most recent waltz backup
+
+Options:
+	-h        help message.
+	-a <days> min age in days
+	-x        trace the shell
+"
+
+OPTS=":ha:x"
+while getopts "$OPTS" optchar
+do
+	case $optchar in
+		h)  echo "$USAGE" ; exit 0 ;;
+		a)  MINAGE="$OPTARG" ;;
+		x)  set -x ;;
+
+		\:) echo "Missing option value for -$OPTARG" >&2 ; exit 1 ;;
+		\?) echo "Invalid option: -$OPTARG" >&2 ; exit 1 ;;
+	esac
+done
+shift $((OPTIND-1))
+
+[ $# != 0 ] && echo filter on "$1" >&2 && eval "filter() { egrep '$1'; }"
+
+# Not a waltz backup host.
+! type waltz >/dev/null 2>&1 && exit 0
+
+# Config file
+CONF=/var/polka/etc/waltz.conf
+[ ! -f "$CONF" ] && exit
+
+# Look at all the waltz backups ....
+waltz -W -f "$CONF" | 
+	filter |
+	cut -d '	' -f 1,3,4,5 | 
+	sort | uniq | 
+	while read host hostb dirb name
+	do
+		# ignore any not on this machine
+		[ "x$hostb" != "x$SHORT" -a "x$hostb" != "x$FQDN"  ] && continue
+
+		# Look at the latest link....
+		latest="$dirb/$name/latest"
+
+		# Age of link file (mostly age of backup)
+		Y=$(stat -c '%Y' "$latest")
+		[ -z "$Y" ] && Y=0
+		AGE=$(( ( $(date +%s) - "$Y" ) / 86400 ))
+		[ "$MINAGE" -gt "$AGE" ] && continue
+
+		# Destination
+		echo -n "$AGE	"
+		{ readlink "$latest" 2>&1 || echo Missing; } | sed -e "s!\$! $hostb:$dirb $host!"
+
+	done 
+
+exit
+

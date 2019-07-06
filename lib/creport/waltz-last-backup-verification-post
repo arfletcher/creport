@@ -1,0 +1,9 @@
+#! /bin/ksh
+
+titlesummary \
+	'-missing backup=^inf' \
+	'-very old backup=(^\s*\d++)(??{$^N>30 ? "":"^"})' \
+	'-old backup=(^\s*\d++)(??{$^N>6 && $^N<31 ? "":"^"})' \
+	'-stuck backup=(^\s*\d++)(??{$^N>1 && $^N<7 ? "":"^"})' \
+
+

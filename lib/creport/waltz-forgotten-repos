@@ -1,0 +1,46 @@
+#!/bin/ksh
+
+# Find any forgotton waltz repos.
+
+# creport options
+## post sed -e 's/:[[:space:]]/:/' | sort -k2 | column -t
+## errors hide
+
+# Payload
+
+# Vestigial command line
+quick=
+[ "x$1" = "x-q" ] && shift && quick=1
+
+ACTIVE=$(mktemp) || exit 1
+trap '/bin/rm -f "$ACTIVE"' 0
+
+# Create a list of in-use host repos
+waltz -f /var/polka/etc/waltz.conf -W | 
+	while read host dir hostb dirb subdir
+	do
+		[ "x$hostb" = "x${HOSTNAME}" ] && continue
+		[[ "$hostb" = ${HOSTNAME}.* ]] && continue
+
+		echo $dirb/$subdir
+	done |
+	sort | uniq > "$ACTIVE"
+
+# Look for any host reports not in the above list
+find /export /bimas -maxdepth 4 -name "\latest" 2>/dev/null |
+	egrep waltz |
+	sed -e "s!/latest!!" |
+	sed -e 's/:[[:space:]]*/:/' |
+	sort | egrep -f "$ACTIVE" -v | while read D
+	do
+		#echo "$D	$(readlink $D/latest 2>&1)	$(du -sh $D)"
+		if [ -z "$quick" ]
+		then
+			DU=$(du -sh $D | sed -e 's/[[:space:]].*//')
+		else
+			DU="-"
+		fi
+
+		echo "$D	$(readlink $D/latest 2>&1)	$DU"
+	done
+

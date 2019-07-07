@@ -77,6 +77,7 @@ SHELLCMD=
 iscmd=
 GROUPBY=
 PAYLOAD=/dev/null
+DATAFILE=/dev/null
 POSTCMD=
 POST=
 showerrors=
@@ -159,6 +160,9 @@ then
 	# Which report?
 	PAYLOAD=$(which $1 2>/dev/null)
 	[ -z "$PAYLOAD" ] && echo "No such report as '$1'" && exit 1
+
+	# Locate any scriptlet site data
+	DATAFILE="/etc/creport.d/$(basename $PAYLOAD)"
 
 	# What is the "shell" for the script?
 	SHELLCMD=$(sed -e '1 { s/^#!//;q}' "$PAYLOAD")
@@ -248,7 +252,7 @@ trap '/bin/rm -f "$ERRORS"' 0
 {
 	#[ ! -z "$noop" ] && echo clush $CLUSHOPT "$@" -- $SHELLCMD $@
 	echo "$ARGS" |
-	cat - "$PAYLOAD" | 
+	cat - "$DATAFILE" "$PAYLOAD" 2>/dev/null | 
 		$noop clush $CLUSHOPT $CLUSHTARGETS -- $SHELLCMD 2>"$ERRORS" |
 		postcmd | 
 		$collect

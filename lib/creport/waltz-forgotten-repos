@@ -1,6 +1,13 @@
 #!/bin/ksh
 
-# Find any forgotton waltz repos.
+## Find any forgotton waltz backup repositories.
+
+# Waltz is an rsync-based backup program that creates dated,
+# hard-linked backup directories for each host as defined in a crental
+# configiration file. 
+#
+# This script scans for repositories that are no long in use,
+# according to the waltz configs, and should be deleted.
 
 # creport options
 ## post sed -e 's/:[[:space:]]/:/' | sort -k2 | column -t

@@ -1,6 +1,14 @@
 #! /bin/ksh
 
-# Check the dates of the latest waltz backups.
+## Check the dates of the latest waltz backups.
+
+# Waltz is an rsync-based backup program that creates dated,
+# hard-linked backup directories for each host as defined in a crental
+# configiration file.
+#
+# This script scans for date of the most recent backup in each waltz
+# host repositories. Host backups that are not recent may indicate a
+# problem and shuld be investigated.
 
 # creport options
 ##clushopt -N

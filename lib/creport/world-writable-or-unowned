@@ -1,0 +1,38 @@
+#! /bin/ksh
+
+## Find all world writable files and directories, as well as unowned/grouped files.
+
+# Use 'find' in one pass through all local filesystes to look for
+#   . files that are world wriitable
+#   . directories that are world writeable but without the sticky bit
+#   . files and directories that have no valid user or group 
+#
+# Sort by category.
+#
+# These files/ and directories ar typically flagged by enteprise
+# security agents.
+#
+# Usage: world-writable-files [<directories>]
+# Usage: creport -a  world-writable-files [<directories>]
+#
+# ARF 07 July 2019
+
+# Clush directives
+##clushopt -Lq
+##groupby host
+##errors hide
+
+# Set default to be all local file systems
+[ $# = 0 ] && set -- $(lsblk -l -n -o MOUNTPOINT | egrep '^/' | sort | uniq )
+
+# Find naughty files and directories.
+find "$@" -xdev \
+	\( \
+		\( -type f -perm /o+w              -printf 'PERM %M %p\n' \) -o \
+		\( -type d -perm /o+w ! -perm /o+t -printf 'PERM %M %p\n' \) -o \
+		-true \
+	\) \
+	\( -nouser -o -nogroup -printf 'NUG  %u %g %p\n' \) \
+   2>/dev/null |
+   sort
+

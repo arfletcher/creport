@@ -3,7 +3,7 @@
 # Get a report on agent deployment.
 
 # creport options.
-##clushopt -Lq -x @FW_leg
+##clushopt -Lq
 ##groupby results
 
 ###### Payload ###############
@@ -11,37 +11,31 @@
 # List of systems to exclude.
 [[ $(lsb_release -sir) = CentOS\ 5.* ]] && echo Ignored && exit 0
 
-# Check on the various agents
+whence ifne >/dev/null || echo Command ifne missing
 
 reportagent () {
 	name="$1"; shift
 	ps h -C "$name" >/dev/null && echo "$@" is running || echo "$@" is not running
 }
 
-lsb_release -si | egrep -i "CentOS|Redhat|Scientific" >/dev/null && reportagent cbdaemon CarbonBlack
-
-reportagent nessusd Tenable Agent
-
-reportagent BESClient BigFix
-
-if egrep "\\b$(hostname -f)\\b" /var/polka/etc/hosts 2>/dev/null | egrep '#.*\bexternal\b' >/dev/null
-then
-	reportagent splunkd Splunk Forwarder
-fi
-
-# check that clamav antivirus is installed.
-[ -x /usr/bin/clamscan ] && echo clamav is installed || echo clamav is not installed
 
 ###############################################
-# Agent status.
+# ClamAV
+clamscan -V | sed -e 's!/... .*!!' -e 's/ / version /'
+[ -x /usr/bin/clamscan ] && echo ClamAV is installed || echo ClamAV is not installed
+
+###############################################
+# Carbon Black
+lsb_release -si | egrep -i "CentOS|Redhat|Scientific" >/dev/null && reportagent cbdaemon CarbonBlack
+[ -x /usr/sbin/cbdaemon ] && /usr/sbin/cbdaemon -v | sed -n -e 's/ (.*//' -e 's/CbDaemon/CarbonBlack/p'
 
 ###############################################
 # Tenable 
 
-# Tenable status
-/opt/nessus_agent/sbin/nessuscli agent status 2>&1 | egrep -i Link | egrep -v failed | sed -e 's/to:/to/' -e 's/\[.*\]/Tenable:/'
+reportagent nessusd Tenable Agent
 
-whence ifne >/dev/null || echo Command ifne missing
+/opt/nessus_agent/sbin/nessuscli agent status 2>&1 | egrep -i Link | egrep -v failed | sed -e 's/to:/to/' -e 's/\[.*\]/Tenable:/'
+/opt/nessus_agent/sbin/nessusd -v | sed -n -e 's/ .build.*//' -e 's/nessusd (Nessus)/Tenable version/p'
 
 # Check Tenable daily scan
 LOG=/opt/nessus_agent/var/nessus/logs/backend.log
@@ -58,6 +52,7 @@ fi
 
 ###############################################
 # BigFix
+reportagent BESClient BigFix
 
 # Check BigFix logs over the last day and a bit.
 LOGS=$(
@@ -70,6 +65,8 @@ done
 
 if [ -n "$LOGS" ]
 then
+	sed -n -e 's/ built for .*//' -e 's/^[[:space:]]*Client version /BigFix version /p' $LOGS | tail -1
+
 	#egrep -B 1 'Encrypted Report posted successfully' $LOG  | tail -2 | sed -e '1{s/^/BigFix Last Check In /; q}'
 	egrep -h 'Report posted successfully' $LOGS | tail -1 | sed -e 's/^[[:space:]]*/BigFix /'
 
@@ -86,11 +83,13 @@ du -sh '/opt/tivoli' 2>/dev/null | egrep '[TG]' > /dev/null && echo "BigFix Larg
 
 ###############################################
 # Splunk
+reportagent splunkd Splunk Forwarder
+
 DIR=/opt/splunkforwarder/var/log/splunk
 if [ -d "$DIR" ]
 then
 	# Version
-	sed -n -e 's/VERSION=/Splunk version /p' /opt/splunkforwarder/etc/splunk.version
+	sed -n -e 's/VERSION=/SplunkForwarder version /p' /opt/splunkforwarder/etc/splunk.version
 
 	# Is Splunk talking to the servers?
 	egrep 'group=per_source_thruput, series="/opt/splunkforwarder/var/log/splunk/metrics.log"' $DIR/metrics.log > /dev/null && 
@@ -109,4 +108,10 @@ then
 	egrep $(date "+^%m-%d-%Y ") $DIR/splunkd.log | sed -n -e 's/.*error getting attributes of path "//p' | sed -e 's/".*//' | sort | uniq | ifne paste -d, -s | sed -e 's/^/Splunk Permission issues: /'
 fi
 
+###############################################
+# FireEye HX
+reportagent xagt FireEyeHX
+[ -x /opt/fireeye/bin/xagt ] && /opt/fireeye/bin/xagt -v | sed -e 's/^/FireEyeHX version /'
+
 exit 0
+

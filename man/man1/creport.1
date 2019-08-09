@@ -1,0 +1,38 @@
+.TH "creport" "1" "2019\-07\-01"
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
+.SH "NAME"
+creport \- Run  script on a collection of remote systems using clush and collect the results as a report.
+.SH "SYNOPSIS"
+.HP \w'\fBifne\ [\-n]\ command\fR\ 'u
+\fBifne [\-n] command\fR
+.SH "DESCRIPTION"
+.PP
+\fBifne\fR
+runs the following command if and only if the standard input is not empty\&.
+.SH "OPTIONS"
+.PP
+\fB\-n\fR
+.RS 4
+Reverse operation\&. Run the command if the standard input is empty\&.
+.sp
+Note that if the standard input is not empty, it is passed through ifne in this case\&.
+.RE
+.SH "EXAMPLE"
+.HP \w'\fBfind\ \&.\ \-name\ core\ |\ ifne\ mail\ \-s\ "Core\ files\ found"\ root\fR\ 'u
+\fBfind \&. \-name core | ifne mail \-s "Core files found" root\fR
+.SH "AUTHOR"
+.PP
+Copyright 2008 by Javier Merino <cibervicho@gmail\&.com>
+.PP
+Licensed under the GNU GPL

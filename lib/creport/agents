@@ -1,6 +1,8 @@
 #!/bin/ksh
 
-# Get a report on agent deployment.
+## Report agent deployment.
+## List the information on required agents: running, config, etc..
+## BigFix, Tenable, Carbon Black, FireEye HX, ClamAV, Splunk.
 
 # creport options.
 ##clushopt -Lq
@@ -21,8 +23,8 @@ reportagent () {
 
 ###############################################
 # ClamAV
-clamscan -V | sed -e 's!/... .*!!' -e 's/ / version /'
 [ -x /usr/bin/clamscan ] && echo ClamAV is installed || echo ClamAV is not installed
+clamscan -V | sed -e 's!/... .*!!' -e 's/ / version /'
 
 ###############################################
 # Carbon Black
@@ -34,17 +36,26 @@ lsb_release -si | egrep -i "CentOS|Redhat|Scientific" >/dev/null && reportagent 
 
 reportagent nessusd Tenable Agent
 
-/opt/nessus_agent/sbin/nessuscli agent status 2>&1 | egrep -i Link | egrep -v failed | sed -e 's/to:/to/' -e 's/\[.*\]/Tenable:/'
-/opt/nessus_agent/sbin/nessusd -v | sed -n -e 's/ .build.*//' -e 's/nessusd (Nessus)/Tenable version/p'
-
-# Check Tenable daily scan
-LOG=/opt/nessus_agent/var/nessus/logs/backend.log
-if [ -f $LOG ]
+if [ -d /opt/nessus_agent ]
 then
-	sed -n -e "s/.*Started remote scan '//p" "$LOG" | sed -e 's/. as local scanner.*//' | tail -1 | sed -e 's/  */ /g' -e 's/^/Tenable Task /' | egrep . || echo Tenable Daily Tenable Scan missing
+	/opt/nessus_agent/sbin/nessuscli agent status 2>&1 | egrep -i Link | egrep -v failed | sed -e 's/to:/to/' -e 's/\[.*\]/Tenable:/'
+	/opt/nessus_agent/sbin/nessusd -v | sed -n -e 's/ .build.*//' -e 's/nessusd (Nessus)/Tenable version/p'
 
-	# See if the Tenable Agent is trashing during the last hour.
-	egrep $(date +%d/%b/%Y:%H -d "last hour" ) "$LOG" | egrep logdaily | sed 1,5d | ifne echo Tenable thrashing 
+	# Check Tenable daily scan
+	LOG=/opt/nessus_agent/var/nessus/logs/backend.log
+	if [ -f $LOG ]
+	then
+		sed -n -e "s/.*Started remote scan '//p" "$LOG" |
+			sed -e 's/. as local scanner.*//' |
+			tail -1 |
+			sed -e 's/  */ /g' -e 's/^/Tenable Task /' |
+			egrep . || echo Tenable Daily Tenable Scan missing
+
+		# See if the Tenable Agent is thrashing during the last hour.
+		egrep $(date +%d/%b/%Y:%H -d "last hour" ) "$LOG" | egrep logdaily | sed 1,5d | ifne echo Tenable thrashing 
+	else
+		echo Tenable not logging
+	fi
 
 else
 	echo Tenable not installed

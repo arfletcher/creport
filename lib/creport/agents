@@ -124,5 +124,15 @@ fi
 reportagent xagt FireEyeHX
 [ -x /opt/fireeye/bin/xagt ] && /opt/fireeye/bin/xagt -v | sed -e 's/^/FireEyeHX version /'
 
+###############################################
+# Forescout
+reportagent ForeScoutSecureConnector.bin Forescout
+LOG=/usr/lib/forescout/bin/log/fs_sc.log
+if [ -f "$LOG" ]
+then
+	sed -n -e 's/",$//' -e 's/.*sc_version": "/Forescout version /p' $LOG | tail -1
+	sed -n 's/.*got compliance message :/Forescout compliance/p' $LOG | tail -1
+fi
+
 exit 0
 

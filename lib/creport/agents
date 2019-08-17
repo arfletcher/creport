@@ -124,6 +124,11 @@ fi
 reportagent xagt FireEyeHX
 [ -x /opt/fireeye/bin/xagt ] && /opt/fireeye/bin/xagt -v | sed -e 's/^/FireEyeHX version /'
 
+/opt/fireeye/bin/xagt -G -T 3600 |
+	sed -n -e 's/.  Attempt: [0-9]*$//' -e 's/.*tcp.cc:0827: m=TCPConnect //p' |
+	sort | uniq | paste -s -d, |
+	sed -e 's/^/FireEyeHX connections /'
+
 ###############################################
 # Forescout
 reportagent ForeScoutSecureConnector.bin Forescout

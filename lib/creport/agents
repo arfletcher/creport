@@ -135,9 +135,12 @@ reportagent ForeScoutSecureConnector.bin Forescout
 LOG=/usr/lib/forescout/bin/log/fs_sc.log
 if [ -f "$LOG" ]
 then
-	sed -n -e 's/",$//' -e 's/.*sc_version": "/Forescout version /p' $LOG | tail -1
-	sed -n 's/.*got compliance message :/Forescout compliance/p' $LOG | tail -1
+	LOGS=$(ls -1rt /var/log/forescout/fs_sc.log*)
+
+	sed -n -e 's/",$//' -e 's/.*sc_version": "/Forescout version /p' ${LOGS} | tail -1
+	sed -n 's/.*got compliance message :/Forescout status/p' ${LOGS} | tail -1
 fi
+
 
 exit 0
 

@@ -67,7 +67,6 @@ Invocation: $0 $@
 
 # Defaults
 collect=
-info () { cat; }
 SPATH=$(readlink -f $(dirname $(which $0) )/../lib/creport)
 OUT() { cat; }
 TITLE=
@@ -104,6 +103,7 @@ ARGS=
 groupbyresult () { sed -e 's/^\([^:]*\): \(.*\)/\2:::: \1/' | sort | prefix2header -n -u -s '::::\s+' | fmt ; }
 groupbyhost   () { prefixsort | prefix2header; }
 Paragraph () { sed -e "1i$1" | sed -e "1{p;s/./-/g};2,\$s/^/  /" -e '$a\\'; }
+info () { ifne ksh -c "echo '$INFO' | fmt; echo; cat;"; }
 
 
 # If not in a terminal, deliver report via email
@@ -118,7 +118,8 @@ do
 
 		n)  noop=echo ;;
 
-		I)  INFO="$OPTARG" ;;
+		I)  INFO="$INFO
+$OPTARG" ;;
 		T)  TITLE="$OPTARG" ;;
 		c)  iscmd=1 ;;
 		S)  SPATH="$OPTARG" ;;
@@ -175,6 +176,7 @@ then
 	# Default options from payload.
 	[ -z "$TITLE" ]        && TITLE=$(sed -n -e 's/^##[[:space:]]*title[[:space:]]//ip' "$PAYLOAD")
 	[ -z "$INFO" ]         && INFO=$(sed -n -e 's/^##[[:space:]]*info[[:space:]]//ip' "$PAYLOAD")
+	##[ -z "$INFO" ]         && INFO=$(sed -n -e 's/^##[[:space:]][[:space:]]*//p' "$PAYLOAD")
 	[ -z "$CLUSHTARGETS" ] && CLUSHTARGETS=$(sed -n -e 's/^##[[:space:]]*clush[[:space:]]//ip' "$PAYLOAD")
 	[ -z "$CLUSHOPT" ]     && CLUSHOPT=$(sed -n -e 's/^##[[:space:]]*clushopt[[:space:]]//ip' "$PAYLOAD")
 	[ -z "$GROUPBY" ]      && GROUPBY=$(sed -n -e 's/^##[[:space:]]*groupby[[:space:]]//ip' "$PAYLOAD")
@@ -236,7 +238,6 @@ eval "postcmd () { $POSTCMD; }"
 [ -z "$POST" ] && POST=cat
 eval "POST () { $POST; }"
 
-[ ! -z "$INFO" ] && info () { sed -e "1i$INFO\\n"; }
 
 [ -z "$TITLE" ] && TITLE=Report
 [ -z "$CLUSHTARGETS" ] && CLUSHTARGETS="$DEFAULTCLUSHTARGETS"
@@ -257,7 +258,12 @@ trap '/bin/rm -f "$ERRORS"' 0
 		postcmd | 
 		$collect
 
-	[ "x$showerrors" = "xshow" ] && cat "$ERRORS" | sed -e "1i\\\nErrors"  -e 's/^/  /'
+	[ "x$showerrors" = "xshow" ] && cat "$ERRORS" | 
+		sed -n -e 's/: ssh: connect to host .* port .*//p' | uniq | ifne paste -s '-d ' | fmt |
+		sed -e "1i\\\nUnavailable"  -e 's/^/  /' 
+
+	[ "x$showerrors" = "xshow" ] && cat "$ERRORS" | grep -v 'exited with exit code 255' | grep -v ': ssh: connect to host ' | sed -e "1i\\\nErrors"  -e 's/^/  /' -e '/clush: .*pearl: exited with exit code 255/d'
+
 } |
 	info |
 	Paragraph "$TITLE" |

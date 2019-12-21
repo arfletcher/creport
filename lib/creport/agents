@@ -65,6 +65,8 @@ fi
 # BigFix
 reportagent BESClient BigFix
 
+if [ -d /var/opt/BESClient ]
+then
 # Check BigFix logs over the last day and a bit.
 LOGS=$(
 for w in yesterday now
@@ -85,11 +87,13 @@ then
 	sed -n 's/^.*Successful Synchronization with site .//p' $LOGS | sed -e "s/' .*//" | sort | uniq | paste -s '-d;' | sed -e 's/;/; /g' | sed -e 's/^$/Missing Custom Group/' -e 's/^/BigFix Sites: /'
 else
 	:
-	#echo "BigFix no log"
+	echo "BigFix no logs"
 fi
 
 # Check that nothing is wrong.
 du -sh '/opt/tivoli' 2>/dev/null | egrep '[TG]' > /dev/null && echo "BigFix Large Tivoli cache"
+
+fi
 
 
 ###############################################
@@ -122,12 +126,15 @@ fi
 ###############################################
 # FireEye HX
 reportagent xagt FireEyeHX
-[ -x /opt/fireeye/bin/xagt ] && /opt/fireeye/bin/xagt -v | sed -e 's/^/FireEyeHX version /'
+if [ -x /opt/fireeye/bin/xagt ]
+then
+	/opt/fireeye/bin/xagt -v | sed -e 's/^/FireEyeHX version /'
 
-/opt/fireeye/bin/xagt -G -T 3600 |
-	sed -n -e 's/.  Attempt: [0-9]*$//' -e 's/.*tcp.cc:0827: m=TCPConnect //p' |
-	sort | uniq | paste -s -d, |
-	sed -e 's/^/FireEyeHX connections /'
+	/opt/fireeye/bin/xagt -G -T 3600 |
+        	sed -n -e 's/.  Attempt: [0-9]*$//' -e 's/.*tcp.cc:0827: m=TCPConnect //p' |
+		sort | uniq | paste -s -d, |
+		sed -e 's/^/FireEyeHX connections /'
+fi
 
 ###############################################
 # Forescout
@@ -141,6 +148,11 @@ then
 	sed -n 's/.*got compliance message :/Forescout status/p' ${LOGS} | tail -1
 fi
 
+###############################################
+# Endgame
+reportagent esensor Endgame
+
+pgrep esensor | xargs -r lsof -p | sed -n 's/.*TCP .*->/Endgame connected to /p' | sed -n -e 's/ (ESTABLISHED)//p' 
 
 exit 0
 

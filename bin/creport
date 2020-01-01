@@ -258,17 +258,32 @@ trap '/bin/rm -f "$ERRORS"' 0
 		postcmd | 
 		$collect
 
-	[ "x$showerrors" = "xshow" ] && cat "$ERRORS" | 
-		sed -n -e 's/: ssh: connect to host .* port .*//p' | uniq | ifne paste -s '-d ' | fmt |
-		sed -e "1i\\\nUnavailable"  -e 's/^/  /' 
+	#nl "$ERRORS"
+	if [ "x$showerrors" = "xshow" ]
+	then
+	
+		# Find any unavailable hosts
+		cat "$ERRORS" | 
+			sed -n -e 's/.* ssh: connect to host \([^[:space:]]*\) port [0-9]*: No route to host/\1/p' | uniq | ifne paste -s '-d ' | fmt |
+			sed -e "1i\\\nUnavailable"  -e 's/^/  /' 
 
-	[ "x$showerrors" = "xshow" ] && cat "$ERRORS" | grep -v 'exited with exit code 255' | grep -v ': ssh: connect to host ' | sed -e "1i\\\nErrors"  -e 's/^/  /' -e '/clush: .*pearl: exited with exit code 255/d'
+		# Find any unresolvable hosts
+		cat "$ERRORS" | 
+			sed -n -e 's/.*Could not resolve hostname \([^[:space:]]*\): Name or service not known/\1/p' | uniq | ifne paste -s '-d ' | fmt |
+			sed -e "1i\\\nUnresolved"  -e 's/^/  /' 
+
+		# Show any errors, ignoring the above.
+		cat "$ERRORS" | 
+			grep -v 'exited with exit code 255' |
+			grep -v 'ssh: connect to host ' | 
+			egrep -v 'Could not resolve hostname .*: Name or service not known' |
+			sed -e "1i\\\nErrors"  -e 's/^/  /' 
+
+	fi
 
 } |
 	info |
 	Paragraph "$TITLE" |
-	#tee /tmp/QQWWEE |
 	POST |
-	#tee /tmp/QQWWEE |
 	OUT
 

@@ -1,7 +1,13 @@
 #!/bin/ksh
 
-# creport test script
-## Info This is a test script
+## creport test script title
+
+## Double hash comment
+# Single hash comment
+
+## Info This is a test script (info line).
+## Info Line 2 of the info.
+
 ## groupby results
 ## post sed -e 's/$/%/' -e 's/:/-:/'
 ## clushopt --pick=7

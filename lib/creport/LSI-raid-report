@@ -1,5 +1,7 @@
 #!/bin/ksh
 
+## LSI Raid report
+
 # report generation: creport -C lsi-raid-report
 ##clushopt -qL
 ##clush -a
@@ -42,10 +44,11 @@ fi
 # List each drive status
 $MegaCli -PDlist -aALL -NoLog |
    perl -ne '
-	if ( $_ =~ /Slot|state|Error/){ 
+	if ( $_ =~ /Enclosure Device ID:|Slot|state|Error/){ 
                   chomp; 
                   $_ .="\t"; 
-                  s/Slot/\nSlot /; 
+                  s/Enclosure Device ID:/\nEnc /; 
+                  s/Slot/Slot /; 
                   s/ Count//; 
                   s/Firmware state://;
                   s/Error/Err/; 
@@ -53,6 +56,11 @@ $MegaCli -PDlist -aALL -NoLog |
                   print;}
                 END {print "\n";}
    '
+
+# Look for Rebuild progress.
+MegaCli64 -EncInfo -aAll |
+	perl -ne 'BEGIN {$/ = "";} $E = /Device ID\s+:\s+(\d+)/ ? $1 : -1; $N = /Number of Slots\s+:\s+(\d+)/ ? $1: -1; for ($n=0; $n<$N; ++$n) { print "MegaCli64  -PDRbld -ShowProg -PhysDrv \"[$E:$n]\" -a0\n";} ' |
+	ksh | egrep Rebuild
 
 echo
 

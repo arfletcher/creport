@@ -1,0 +1,103 @@
+#! /bin/ksh
+
+# Find any running executibles with deleted programs
+
+# creport options
+## errors hide
+
+PATH=/usr/bin:/bin
+PATH=/usr/sbin:/sbin:$PATH
+PATH=/usr/local/bin:$PATH
+PATH=/usr/local/sbin:$PATH
+
+noop=echo
+if [ "$1" == restart ]
+then
+	noop=
+fi
+
+TMP=$(mktemp)
+
+ls -al /proc/*/exe 2>&1 |
+	sed -n 's/ (deleted)$//p' | 
+	sed -e 's/;[a-f0-9]*$//' |
+	sed -e 's!.*/proc/!!' -e 's!/exe -> !	!' |
+	sort -k2 |
+	tee $TMP
+
+# Restart what we can
+Restart () {
+	#grep /usr/sbin/agetty $TMP >/dev/null && $noop systemctl restart getty@tty1.service && $noop echo restarted getty
+	! grep "$1" $TMP >/dev/null && return
+	#[ -n "$noop" ] && return
+	service "$2" restart && echo restarted "$2"
+}
+
+RESTART2 () {
+	type systemctl >/dev/null 2>/dev/null || return
+	grep "$1" $TMP | while read P EXE
+	do
+		UNIT=$(ps -ho'unit' $P) || continue
+
+		systemctl restart "$UNIT"
+		echo systemctl restart "$UNIT" for $P
+	done
+}
+RESTART () {
+	type systemctl >/dev/null 2>/dev/null || return
+
+	# Find PIDs, associated systemd services and restart.
+	# Ignore sessions or user scopes.
+
+	grep "$1" $TMP | sed -e 's/[[:space:]].*//' |
+		xargs -I_ ps -hounit _ |
+		egrep -v '^user@' | egrep -v '^session' |
+		xargs -I_ systemctl restart _
+}
+
+if [ -z "$noop" ]
+then
+	grep /lib/systemd/systemd $TMP >/dev/null && systemctl daemon-reexec          && echo restarted systemd
+
+	grep /usr/sbin/mdmon      $TMP >/dev/null && /usr/sbin/mdmon --all --takeover && echo restarted mdmon
+
+	RESTART NetworkManager
+	RESTART ModemManager 
+	RESTART systemd-logind
+	RESTART systemd-journald
+	RESTART dnsmasq
+	RESTART sssd
+	RESTART agetty
+	RESTART dbus-daemon
+	RESTART alsactl
+	RESTART rpc.statd
+	RESTART rpc.gssd
+	RESTART accounts-daemon
+
+	#RESTART pulseaudio # this kills user sessions!!!!
+	#RESTART ssh-agent
+
+	RESTART java
+fi
+
+# Clean up
+rm -f "$TMP"
+
+exit 0
+
+cat <<END
+systemctl restart ModemManager
+systemctl restart NetworkManager
+systemctl restart sssd
+systemctl restart systemd-logind
+systemctl restart systemd-journald
+systemctl restart getty@tty1.service
+systemctl restart rpc-gssd.service
+systemctl restart rpc-statd.service
+
+# Apache java lsearchd
+service LUCENE restart
+
+END
+
+

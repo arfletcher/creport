@@ -10,9 +10,9 @@
 ##clush -a
 ##clushopt -qL
 ##errors hide
-######post    run-per-prefix sha256sum | sed -e 's/ -$//' | egrep -v -f "$PAYLOAD.ok" | sort
-##post    run-per-prefix sha256sum | sed -e 's/ -$//' | grep -v -f  <(sed -e 's/[[:space:]].*//' "$PAYLOAD.ok")
-##info If needed, update the list of MD5 checksums in sshd-binary-checksum.ok $PAYLOAD.ok
+##post    run-per-prefix ksh -x 'base64 -d | sha256sum' | sed -e 's/ -$//' | grep -v -f  <(sed -e 's/[[:space:]].*//' "$PAYLOAD.ok")
+
+##info If needed, update the list of checksums in sshd-binary-checksum.ok
 ##groupby results
 
 base64 /usr/sbin/sshd

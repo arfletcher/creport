@@ -1,13 +1,15 @@
 #!/bin/ksh
 
-# Misc report
-# Find the current running kernel in a version/time ordered list of kernel packages.
-#
+## Misc report
+## Find the current running kernel in a version/time ordered list of kernel packages.
+## Report on the current names servers
+
 
 # Creport options.
 ## post sed -e 's/: \([0-9]*\) \(Kernel:\)/(\1): \2/'
 ## clushopt -qL
 ## groupby results
+## errors hide
 
 # Payload
 
@@ -16,23 +18,59 @@
 #	rpm --qf '%{BUILDTIME} %{Version}-%{release}.%{arch}\n' -q kernel | sort -nr | nl | egrep $(uname -r)
 
 # Look at the kernel image times
-ls -t1 /boot/vmlinuz-* | sed -e 's/.boot.vmlinuz-//' | nl | egrep $(uname -r) | sed -e 's/^  *//' -e 's/[[:space:]].*//' | egrep -v '^1$' | sed -e 's/$/ Kernel: newer installed/'
+#ls -t1 /boot/vmlinuz-* | sed -e 's/.boot.vmlinuz-//' | nl | egrep $(uname -r) | sed -e 's/^  *//' -e 's/[[:space:]].*//' | egrep -v '^1$' | sed -e 's/$/ Kernel: newer installed/'
+
+find /boot -name grub.cfg -o -name grub.conf |
+	xargs -r egrep "^(menuentry|title)" |
+	nl |
+	grep $(uname -r) |
+	sed 1q |
+	cut -f1  |
+	egrep -v '^[[:space:]]*1$' |
+	sed -e 's/.*/old/' |
+	sed -e 's/^/Kernel: /'
 
 # Report kernel anyway
-uname -r | sed -e 's/^/Kernel: /'
-
-# Nameservers
-{ sed -n -e 's/^[[:space:]]*nameserver//p' /etc/resolv.conf | sort | paste -d, -s | egrep . || egrep None; } | sed 's/^/Nameservers: /'
+#uname -r | sed -e 's/^/Kernel: /'
 
 # IPMI
 [ "Supermicro" = "$(dmidecode -s system-manufacturer)" ] &&
 ipmicfg -m 2>&1 |
 	sed -n 's/IP=//p' |
-	sed -e 's/^192\..*/LAN/' -e 's/0.0.0.0/Disabled/' -e 's/[0-9][0-9]\.[0-9][0-9]\.[0-9][0-9]\.[0-9][0-9]/on NIHnet!/' |
+	sed -e 's/^192\..*/LAN/' -e 's/0.0.0.0/Disabled/' -e 's/[0-9][0-9]\.[0-9][0-9]\.[0-9][0-9]\.[0-9][0-9]/on Net!/' |
 	sed -e 's/^/SM IMPI /' 
 
 
 #dmidecode -s system-manufacturer | sed -e "s/[[:space:]]*$//" | sed -e 's/^/Manufacturer /'
+
+# IPMI in the wrong place
+[ "Supermicro" = "$(dmidecode -s system-manufacturer)" ] &&
+ipmicfg -m 2>&1 |
+	sed -n 's/IP=//p' |
+	sed -e 's/^192\..*/LAN/' -e 's/0.0.0.0/Disabled/' -e 's/[0-9][0-9]\.[0-9][0-9]\.[0-9][0-9]\.[0-9][0-9]/on Net!/' |
+	egrep Net |
+	sed -e 's/^/SM IMPI /' 
+
+# check that various things are installed and running.
+[ ! -x /usr/bin/clamscan ] && echo clamav not installed
+
+#[ -d /etc/.git ] && echo etckeeper is installed || echo etckeeper is not installed
+[ ! -d /etc/.git ] && echo etckeeper is not enabled
+
+[ ! -f /etc/krb5.keytab ] && echo AD Without keytab file
+[ -f /etc/krb5.keytab ] && ! kinit -k  && echo AD failed join 
+
+if [ ! -f  /var/lib/mlocate/mlocate.db ]
+then
+	echo mlocate.db missing
+else
+	{
+		stat -c %Y /var/lib/mlocate/mlocate.db ; date +%s; echo '48 3600 * --p' 
+	} | dc | grep -- - > /dev/null && echo mlocate.db old
+fi
+
+# Nameservers
+{ sed -n -e 's/^[[:space:]]*nameserver//p' /etc/resolv.conf | sort | paste -d, -s | egrep . || egrep None; } | sed 's/^/Nameservers: /'
 
 exit 0
 

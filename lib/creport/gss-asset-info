@@ -1,0 +1,333 @@
+#!/bin/ksh
+
+## Describe a Linux host: OS, CPUs, discs, applications, etc..
+
+# cat gss-asset-info | clush -w @SIO -NB /bin/ksh | gss-finish >! /tmp/SIO-inventory-$(date +%F).csv
+
+# creport support
+## clushopt -qLN
+## clush -w @hosts:SIO
+## post sed -e 's/^  //'
+
+# command line
+hideempty=1
+quick=
+USAGE="Usage: $0 [<options>]
+Options:
+	-h	This help message
+	-e	Ignore empty values
+	-f	Report empty vaues
+	-q	Quick run
+"
+while getopts ":heq" optchar
+do
+        case $optchar in
+                h)  echo "$USAGE" ; exit 0 ;;
+                e) hideempty=1 ;;
+                e) hideempty= ;;
+                q) quick=1 ;;
+
+                \:) echo "Missing option value for -$OPTARG" >&2 ; exit 1 ;;
+                \?) echo "Invalid option: -$OPTARG" >&2 ; exit 1 ;;
+        esac
+done
+shift $((OPTIND-1))
+############################################################################################
+
+PATH=/sbin:/usr/sbin:$PATH
+
+# Just in case.
+! type ifne >/dev/null && echo "no ifne on $(hostname -f)" >&2 && exit 1
+
+# Characteristics about host
+#GSS="NHLBI Research Support"
+GSS="CIT IRP Collaborative Research Systems"
+
+##################### Payload ############################
+linejoin () { sort | paste -s '-d ' | sed -e "s/^/$1	/"; }
+[ "1" = "$hideempty" ] && linejoin () { sed -e '/^$/d' | sort | ifne paste -s '-d ' | sed -e "s/^/$1	/"; }
+#linejoin () { VAL=$(sort | ifne paste -s '-d '); VAR="$(echo $@ | sed -e 's/ /_/g')"; print "$VAR	$VAL"; eval "$VAR='$VAL'"; }
+
+fsencrypted () {
+#!/bin/ksh
+
+# List (un)encrypted mountpoints
+# ARF 13 February 2019
+
+# Defaults
+flag=
+que=
+OUT () { cat; }
+USAGE="Usage: $0 [<options>]
+Options:
+	-h	This help message
+	-e	Report encrypted filessystem (default)
+	-u	Report unencrypted filessystem
+	-q	Just ask the question: encrypted or not.
+"
+
+# command line
+while getopts ":heuq" optchar
+do
+        case $optchar in
+                h)  echo "$USAGE" ; exit 0 ;;
+
+                e) flag='' ;;
+                u) flag=! ;;
+
+                q) que="!"; OUT () { egrep -v '^/boot' | egrep . > /dev/null && echo no || echo yes; } 
+		;;
+
+                \:) echo "Missing option value for -$OPTARG" >&2 ; exit 1 ;;
+                \?) echo "Invalid option: -$OPTARG" >&2 ; exit 1 ;;
+        esac
+done
+shift $((OPTIND-1))
+
+# List encrypted mountpoints
+lsblk -nis -o 'NAME,TYPE,MOUNTPOINT' |
+	egrep -v '^loop' |			# ignore loops, snaps
+	sed -e 's/^[ \|\`]*-/\`-/' |
+	sed -e 's/^[^ \|\`]/\n&/' |		# turn disc groups into separate paragraphs
+	awk -v RS='' -v ORS="\n\n" $que$flag'/ crypt/' | # look for paragraphs that are encrypted
+	#cat; exit
+	while read NAME TYPE MOUNTPOINT
+	do
+		# Announce mount point
+		[ -n "$MOUNTPOINT" ] && print $MOUNTPOINT
+	done |
+		sort | uniq |
+		#pee cat 'cat >&2' |
+		OUT
+
+		#sort | uniq | ifne paste -s '-d ' | sed -e 's/^/Encrypted /'
+
+}
+###############################
+
+# Names
+hostname -s | linejoin Host
+hostname -s | linejoin Asset_Name
+hostname -s | linejoin DCBhost
+hostname -f | linejoin Hostname
+{ 
+	pgrep smbd >/dev/null && hostname -s || echo N/A 
+} | linejoin NETBIOS Name 
+
+# Date of report
+date +%FT%T | linejoin When
+
+# Addresses
+! type ip > /dev/null && echo ip missing on $(hostname) PATH=$PATH >&2
+ip -0 -o a | sed 1d | sed -n -e 's/ brd .*//' -e 's/^.*link.ether //p' | linejoin MAC_Address
+{
+	ip -4 -o a | sed 1d | sed -n -e 's!/.*!!' -e 's/^.*inet6* //p' #| egrep -v '^192\.168\.'
+	ip -6 -o a | sed 1d | sed -n -e 's!/.*!!' -e 's/^.*inet6* //p' | egrep -v fe80::
+} | linejoin IP_Address
+
+# Networks
+ip -4 -o r | sed -e 's/[[:space:]].*//' | sort | uniq | egrep '/' | grep -v 169.254.0.0/16 | grep -v 192.168.122.0/24 | linejoin IPv4-Networks
+ip -6 -o r | sed -e 's/[[:space:]].*//' | sort | uniq | egrep -v 'fe80::' | egrep '/' | linejoin IPv6-Networks
+
+# Are we on campus network or are we private?
+# private addresses are: 192.168.0.0/16, 
+# Ignore 10.0.0.0/8 because campuses are using this in lieu of public IPv4 addresses.
+{
+ip -4 -o r | sed -e 's/[[:space:]].*//' | sort | uniq | grep '/' | grep -v 169.254.0.0/16 | grep -v 192.168.122.0/24 | egrep '^192\.168\.' >/dev/null && echo Private
+ip -4 -o r | sed -e 's/[[:space:]].*//' | sort | uniq | grep '/' | grep -v 169.254.0.0/16 | grep -v 192.168.122.0/24 | egrep -v '^192\.168\.' | grep . >/dev/null && echo Net
+} | linejoin Network
+
+# Product, Versions, Patch_Level
+{ lsb_release -sir | tr '\n' ' ' |sed -e 's/^\(.\)[^ ]* /\1/' -e 's/\..*//'; echo; } | linejoin OS
+lsb_release -si | sed -e 's/RedHat[^ ]*/RedHat/' | linejoin Product
+lsb_release -sr | sed -e 's/\..*//' | linejoin Version
+lsb_release -sr | linejoin Patch_Level
+
+# Disc
+lsblk -Sn -o SIZE 2>/dev/null | sort -h | uniq -c |sed -e 's/^  *//' -e 's/  */x/' -e 's/1x//' | linejoin Disc
+df -lh --output=source,size 2>/dev/mull | sed -n -e 's!^/dev/.*[[:space:]]!!p' | sort -h | uniq -c |sed -e 's/^  *//' -e 's/  */x/' -e 's/1x//' | linejoin Storage
+
+# PII.... based on a file
+{ [ -f /etc/PII ] && echo Yes || echo No; } | linejoin PII
+
+# Host based info.... needs to be of format: <key> <value>
+[ -f /etc/asset-info ] && cat /etc/asset-info | sed -e '/^#/d' -e '/^[[:space:]]*$/d'
+
+# Licence
+{
+case $(lsb_release -sd) in
+	*Red\ Hat*) echo Commercial ;;
+	*) echo Free  ;;
+esac
+} | linejoin License_Type
+
+# Maintenance
+echo Current | linejoin Maintenance_Status
+
+# URLs
+if pgrep httpd >/dev/null
+then
+	sed -n -e 's/^[[:space:]]*servername[[:space:]]*//ip' /etc/httpd/conf.d/*.conf | sort | uniq | sed -e 's!^!https://!'
+else
+	echo N/A
+fi | linejoin URL
+
+# Same thing for DNS CNAMES - the only source is webservers?????
+if pgrep httpd >/dev/null
+then
+	sed -n -e 's/^[[:space:]]*servername[[:space:]]*//ip' /etc/httpd/conf.d/*.conf | sort | uniq | xargs -r -I_ host -t CNAME _ | sed -n -e 's/ is a.*//p'
+fi | linejoin CNAMES
+
+# Description
+VM=$({ virt-what 2>/dev/null || echo unknown ; } | egrep . || echo real;)
+CPUS=$(lscpu | sed -n -e 's/^CPU.s.:[[:space:]]*//p')
+#MEM=$(free -h | sed -n -e 's/Mem:[[:space:]]*//p' | sed -e 's/[[:space:]].*//')
+MEM=$(dmidecode --type memory | sed -n -e 1i0 -e 's/Size: \([0-9]*\) MB/\1 + /p' -e '$a1024 / p' | dc)
+
+echo "$VM $CPUS cpus ${MEM}GB RAM" | linejoin Description
+
+
+########################################################
+# Admins (taken from sudoers-report)
+sed -e '/^Defaults/d' -e '/^#/d' -e '/^$/d' -e 's/#.*//' /etc/sudoers /etc/sudoers.d/* |
+	sed -e 's/[[:space:]].*//' |
+	sort | uniq | egrep . |
+	while read first
+	do
+		case "$first" in
+			# Expand any groups
+			%*) echo $first | sed -e 's/^%//' | xargs getent group nrpe | sed -e 's/.*://' | sed -e 's/,/\n/g'
+			;;
+
+			*) echo $first ;;
+		esac
+	done | 
+	sed -e 's/,/\n/g' |
+	sort | uniq | egrep . |
+	egrep -xv root |
+	xargs -r -n1 -- sudo -l -U 2>/dev/null |
+	sed -e '/^Matching Defaults/i\\
+' |
+	egrep -v ' is not allowed to run sudo on ' |
+	sed -e 's/^User /\n&/' |
+	awk -v RS='' '/may run the following commands/' |
+	sed -e 's/^User /\n&/' |
+	awk -v RS='' '/\(root|ALL\).*[[:space:]]ALL$/' |
+	sed -e 's/^User /\n&/' |
+	sed -n -e 's/User \(.*\) may run the following.*/\1/p' |
+	linejoin Admins
+
+# VM support
+if [ "$VM" != "real" ]
+then
+	echo VM/server | linejoin Type
+	echo $VM | linejoin Vendor
+	echo $VM | linejoin Manufacturer
+	echo $VM | linejoin Model
+	dmidecode -s system-uuid | linejoin SerialNumber
+
+
+	dnsdomainname | sed -e 's/\.nih.gov$//' | sed -e 's/.*\.//' | tr 'a-z' 'A-Z' | linejoin IC
+
+fi
+
+# VMs present
+virsh list --name 2>/dev/null | sort | linejoin Virtual_Machines
+
+# Applications
+# Services
+{
+ps -o comm -C slurmd,nfsd,apache2,httpd,/usr/sbin/httpd,LLAWP,mysqld,postgres,postmaster,dataserver,dibbler-server,dhcpd,gdm,gdm-binary,kdm,kdm_greet,smbd,dockerd,lightdm | 
+	sed 1d |
+	sed -e 's!^.*/!!' \
+		-e 's/postmaster/postgres/' -e 's/dataserver/sybase/' \
+		-e 's/dibbler-server/dibbler/' \
+		-e 's/nfsd/NFS/' \
+		-e 's/slurmd/slurm/' \
+		-e 's/apache2/httpd/' \
+		|
+	sort | uniq |
+	tr '\n' ' ' | sed -e '$a\'
+	
+	ps -o comm -C bareos-dir,bareos-fd | sed -e 1d
+	ps -o command -C rsync | egrep 'rsync --daemon ' > /dev/null && echo rsyncd
+
+	pgrep -u tomcat java 2>/dev/null > /dev/null && echo tomcat
+	pgrep -u root -f globus-gridftp-server >/dev/null 2>&1 && echo globus
+
+	waltz -L -f /etc/waltz.conf 2>/dev/null | egrep "^($(hostname -s)|$(hostname -f)):" >/dev/null && echo backups
+	[ "$(sysctl -en net.bridge.bridge-nf-call-iptables 2>/dev/null )" = "1" ] && echo Firewall
+
+	virsh list --name 2>/dev/null | egrep . >/dev/null && echo VMhost
+
+} | sed -e 's/<defunct>[[:space:]]*//g' | linejoin Applications
+
+# List database sotware - hack
+{
+	rpm -q mysql-server postgresql-server 2>/dev/null | egrep -v 'is not installed'
+	dpkg-query --showformat='${Package}-${Version}\n' --show  'mysql-server-core*' postgresql-10 2>/dev/null | egrep -v '\-$'
+} | linejoin Databases
+
+# Tier for server
+{ [[ $(hostname -s) = *dev ]] && echo DEV || echo PROD ; } | linejoin Tier
+
+# Report is a machine is fully encrypted (ignoring /boot/*)
+fsencrypted -q | linejoin Full_Encryption
+
+# check mlocate database works
+locate /etc/passwd > /dev/null 2>&1 || echo $(hostname -f) mlocate database missing >&2
+# Frameworks
+{
+	locate /wp-admin/about.php | xargs -n 1 -r -- sed -n -e "s/' );.*//" -e '/.*Version_/{s/.*Version_/Wordpress-/p;q}'
+	locate -er '/includes/bootstrap\.inc$' | xargs -r -n 1 -- sed -n -e 's/.);//' -e 's/.*define(.VERSION., ./Drupal /p'
+	locate /Resources/sql/upgrade_fast_versions.txt | xargs -n 1 -r sed -n -e "s/\$/\n/" -e 's/^/REDCap-/' -e '$p'
+	locate /bin/start-confluence.bat | sed -e 's%/bin/start-confluence.bat$%/README.txt%' | xargs -r -n 1 sed -n -e 's/ - Standalone README//' -e 's/Atlassian Confluence /&/p' | sed -e 's/ /-/g'
+
+	# Owncloud and Nextcloud
+	locate -er '/core/routes.php$' | sed -e 's%/core/routes.php$%/version.php%' | while read file
+	do
+		echo 'print "$vendor-$OC_VersionString\n";' | cat  "$file" - | su -s /bin/ksh bin -c php
+	done
+
+} 2>&1 | sort | uniq | linejoin Framework
+
+#######################################################################################
+# Extras
+#echo Entity_Name $GSS
+#echo Parent_Component N/A
+#echo Parent_Asset N/A
+#echo Parent_Entity_Name N/A
+#echo 'IP_Address_Range_(Start)' -
+#echo 'IP_Address_Range_(End)' -
+
+
+########################################
+# common
+#cat<<END
+#System_Name: $GSS
+#IP_Address: $IP_Address
+#Hostname: $Hostname
+#Alias/CNAME:
+#URL: $URL
+#Application(s): $Applications
+#Criticality_(Critical,_High,_Medium,_or_Low):	Medium
+#Related_to_Clincal_or_Animal_Care	No
+#Does_this_system_contain_PHI_or_PII	$PII
+#Environment_Tier_(DEV,_TEST,_INT,_STAGE,_PROD):	$Tier
+#Operating_System: $Product $Version
+
+#cat<<END
+#GSS $GSS
+#Primary_Point_of_Contact	Mihailo_Kaplarevic
+#Primary_point_of_contact_cell_phone	301.451.4659
+#Primary_point_of_contact_email	nhlbi_dir_sio@mail.nih.gov
+#Secondary_point_of_contact	Asim_Okur
+#Secondary_point_of_contact_cell_phone	301.451.9716
+#Secondary_point_of_contact_email	nhlbi_dir_sio@mail.nih.gov
+#Purpose_of_system	Research support
+#Business_Owner	NHLBI-DIR-SIO
+#END
+
+# Must be a newline at the end.
+echo
+

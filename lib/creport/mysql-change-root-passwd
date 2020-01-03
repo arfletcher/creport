@@ -1,8 +1,5 @@
 #! /usr/bin/perl
 
-## Change the MySql root password to a random string, keeping the
-## /root/.my.cnf in sync.
-
 # On machines that are running mysqld, change the mysql root password
 # with a random string and update the .my.cnf file. Attempt to be
 # conservative when changing the password.
@@ -16,7 +13,6 @@
 # quit
 
 # ARF 8 Aug 2012
-#
 ## errors show
 
 use 5;

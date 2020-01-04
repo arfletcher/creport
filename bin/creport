@@ -67,7 +67,7 @@ Invocation: $0 $@
 
 # Defaults
 collect=
-SPATH=$(readlink -f $(dirname $(which $0) )/../lib/creport)
+SPATH=$( dirname $(readlink -f $(which $0) ) )/../lib/creport
 OUT() { cat; }
 TITLE=
 CLUSHOPT=
@@ -160,6 +160,8 @@ if [ -z "$iscmd" ]
 then
 	# Which report?
 	PAYLOAD=$(which $1 2>/dev/null)
+	#echo PATH=$PATH; echo PAYLOAD=$PAYLOAD
+
 	[ -z "$PAYLOAD" ] && echo "No such report as '$1'" && exit 1
 
 	# Locate any scriptlet site data
@@ -261,24 +263,28 @@ trap '/bin/rm -f "$ERRORS"' 0
 	#nl "$ERRORS"
 	if [ "x$showerrors" = "xshow" ]
 	then
+		# Collect different types of clush and ssh errors.
+		{
+		cat <<#'END'
+			code_255	clush: \\(.*\\): exited with exit code 255
+			No_Route	.* ssh: connect to host \\([^[:space:]]*\\) port [0-9]*: No route to host
+			Unresolved	.*Could not resolve hostname \\([^[:space:]]*\\): Name or service not known
+			Denied		\\([^[:space:]][^[:space:]]*\\): Permission denied .*
+		END
+		} | while read TYPE MATCH
+		do
+			# sed magic - print matches to stderr, the rest rewrites the original file
+			sed -i -n -e "s/$MATCH/\1/; terr ; p; bend  
+				:err         
+				w /dev/stderr
+				:end" "$ERRORS" 2>&1 |
+		       	uniq | ifne paste -s '-d ' | fmt |
+			sed -e "1i\\\n$TYPE" -e 's/^/  /' 
+		done
 	
-		# Find any unavailable hosts
+		# Show the left-over errors
 		cat "$ERRORS" | 
-			sed -n -e 's/.* ssh: connect to host \([^[:space:]]*\) port [0-9]*: No route to host/\1/p' | uniq | ifne paste -s '-d ' | fmt |
-			sed -e "1i\\\nUnavailable"  -e 's/^/  /' 
-
-		# Find any unresolvable hosts
-		cat "$ERRORS" | 
-			sed -n -e 's/.*Could not resolve hostname \([^[:space:]]*\): Name or service not known/\1/p' | uniq | ifne paste -s '-d ' | fmt |
-			sed -e "1i\\\nUnresolved"  -e 's/^/  /' 
-
-		# Show any errors, ignoring the above.
-		cat "$ERRORS" | 
-			grep -v 'exited with exit code 255' |
-			grep -v 'ssh: connect to host ' | 
-			egrep -v 'Could not resolve hostname .*: Name or service not known' |
 			sed -e "1i\\\nErrors"  -e 's/^/  /' 
-
 	fi
 
 } |

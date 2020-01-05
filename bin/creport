@@ -110,11 +110,12 @@ info () { ifne ksh -c "echo '$INFO' | fmt; echo; cat;"; }
 #[ ! -t 0 ] && OUT() { subjectise -t "$MAILTO" | ifne sendmail -t; }
 
 # Parse command line.
-while getopts ":hnI:T:cS:eERCaw:x:LBbqNMP:" optchar
+while getopts ":hnI:T:cS:eERCaw:x:LBbqNMP:Z" optchar
 do
 	#echo "option $optchar"
 	case "$optchar" in
                 h)  echo "$USAGE" && exit 0 ;;
+		Z)  find "$SPATH" -type f -executable -printf '%f\n' | column && exit 0 ;;
 
 		n)  noop=echo ;;
 
@@ -152,7 +153,7 @@ shift $(($OPTIND - 1))
 PATH=$SPATH:$PATH
 
 # usage
-[ -z "$SHELLCMD" -a $# = 0 ] && echo "$USAGE" && ls "$SPATH" && exit 1
+[ -z "$SHELLCMD" -a $# = 0 ] && echo "$USAGE" && find "$SPATH" -type f -executable -printf '%f\n' | column && exit 1
 
 # Report title, based on script name.
 

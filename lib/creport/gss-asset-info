@@ -16,15 +16,16 @@ USAGE="Usage: $0 [<options>]
 Options:
 	-h	This help message
 	-e	Ignore empty values
+	-E	Show empty values
 	-f	Report empty vaues
 	-q	Quick run
 "
-while getopts ":heq" optchar
+while getopts ":heEq" optchar
 do
         case $optchar in
                 h)  echo "$USAGE" ; exit 0 ;;
                 e) hideempty=1 ;;
-                e) hideempty= ;;
+                E) hideempty= ;;
                 q) quick=1 ;;
 
                 \:) echo "Missing option value for -$OPTARG" >&2 ; exit 1 ;;

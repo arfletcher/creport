@@ -109,6 +109,9 @@ info () { ifne ksh -c "echo '$INFO' | fmt; echo; cat;"; }
 # If not in a terminal, deliver report via email
 #[ ! -t 0 ] && OUT() { subjectise -t "$MAILTO" | ifne sendmail -t; }
 
+# GNU --help flag
+[ "x$1" = "x--help" ] && echo "$USAGE" && exit 0 
+
 # Parse command line.
 while getopts ":hnI:T:cS:eERCaw:x:LBbqNMP:Z" optchar
 do

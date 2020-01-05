@@ -274,6 +274,7 @@ trap '/bin/rm -f "$ERRORS"' 0
 			No_Route	.* ssh: connect to host \\([^[:space:]]*\\) port [0-9]*: No route to host
 			Unresolved	.*Could not resolve hostname \\([^[:space:]]*\\): Name or service not known
 			Denied		\\([^[:space:]][^[:space:]]*\\): Permission denied .*
+			Timeout		.* ssh: connect to host \\(.*\\) port [0-9]*: Connection timed out
 		END
 		} | while read TYPE MATCH
 		do

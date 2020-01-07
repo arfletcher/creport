@@ -277,57 +277,34 @@ fsencrypted -q | linejoin Full_Encryption
 
 # check mlocate database works
 locate /etc/passwd > /dev/null 2>&1 || echo $(hostname -f) mlocate database missing >&2
+
+# locate files but ignore those in backup or archive directories.
+LOCATE () { locate "$@" | egrep -v '/(archive|backup|waltz)/'; }
+
 # Frameworks
+# This will locate frameworks in backups, archive, etc. if not excluded from the locate database.
 {
-	locate /wp-admin/about.php | xargs -n 1 -r -- sed -n -e "s/' );.*//" -e '/.*Version_/{s/.*Version_/Wordpress-/p;q}'
-	locate -er '/includes/bootstrap\.inc$' | xargs -r -n 1 -- sed -n -e 's/.);//' -e 's/.*define(.VERSION., ./Drupal /p'
-	locate /Resources/sql/upgrade_fast_versions.txt | xargs -n 1 -r sed -n -e "s/\$/\n/" -e 's/^/REDCap-/' -e '$p'
-	locate /bin/start-confluence.bat | sed -e 's%/bin/start-confluence.bat$%/README.txt%' | xargs -r -n 1 sed -n -e 's/ - Standalone README//' -e 's/Atlassian Confluence /&/p' | sed -e 's/ /-/g'
+	# Wordpress, REDcap, Confluence, etc..
+	LOCATE /wp-admin/about.php | xargs -n 1 -r -- sed -n -e "s/' );.*//" -e '/.*Version_/{s/.*Version_/Wordpress-/p;q}'
+	LOCATE -er '/includes/bootstrap\.inc$' | xargs -r -n 1 -- sed -n -e 's/.);//' -e 's/.*define(.VERSION., ./Drupal /p'
+	LOCATE /Resources/sql/upgrade_fast_versions.txt | xargs -n 1 -r sed -n -e "s/\$/\n/" -e 's/^/REDCap-/' -e '$p'
+	LOCATE /bin/start-confluence.bat | sed -e 's%/bin/start-confluence.bat$%/README.txt%' | xargs -r -n 1 sed -n -e 's/ - Standalone README//' -e 's/Atlassian Confluence /&/p' | sed -e 's/ /-/g'
 
 	# Owncloud and Nextcloud
-	locate -er '/core/routes.php$' | sed -e 's%/core/routes.php$%/version.php%' | while read file
+	LOCATE -er '/core/routes.php$' | sed -e 's%/core/routes.php$%/version.php%' | while read file
 	do
-		echo 'print "$vendor-$OC_VersionString\n";' | cat  "$file" - | su -s /bin/ksh bin -c php
+		# evaluate the variables - mmmmm.
+		#echo 'print "$vendor-$OC_VersionString\n";' | cat  "$file" - | su -s /bin/ksh bin -c php
+
+		# Guess the variables.
+		{
+			sed -n -e 's/^$vendor = '\''//p' $file
+			sed -n -e 's/^$OC_VersionString = '\''//p' $file
+
+		} | sed -e "s/';//g" | paste -s  -d-
 	done
 
 } 2>&1 | sort | uniq | linejoin Framework
-
-#######################################################################################
-# Extras
-#echo Entity_Name $GSS
-#echo Parent_Component N/A
-#echo Parent_Asset N/A
-#echo Parent_Entity_Name N/A
-#echo 'IP_Address_Range_(Start)' -
-#echo 'IP_Address_Range_(End)' -
-
-
-########################################
-# common
-#cat<<END
-#System_Name: $GSS
-#IP_Address: $IP_Address
-#Hostname: $Hostname
-#Alias/CNAME:
-#URL: $URL
-#Application(s): $Applications
-#Criticality_(Critical,_High,_Medium,_or_Low):	Medium
-#Related_to_Clincal_or_Animal_Care	No
-#Does_this_system_contain_PHI_or_PII	$PII
-#Environment_Tier_(DEV,_TEST,_INT,_STAGE,_PROD):	$Tier
-#Operating_System: $Product $Version
-
-#cat<<END
-#GSS $GSS
-#Primary_Point_of_Contact	Mihailo_Kaplarevic
-#Primary_point_of_contact_cell_phone	301.451.4659
-#Primary_point_of_contact_email	nhlbi_dir_sio@mail.nih.gov
-#Secondary_point_of_contact	Asim_Okur
-#Secondary_point_of_contact_cell_phone	301.451.9716
-#Secondary_point_of_contact_email	nhlbi_dir_sio@mail.nih.gov
-#Purpose_of_system	Research support
-#Business_Owner	NHLBI-DIR-SIO
-#END
 
 # Must be a newline at the end.
 echo

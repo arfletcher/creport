@@ -103,8 +103,9 @@ ARGS=
 groupbyresult () { sed -e 's/^\([^:]*\): \(.*\)/\2:::: \1/' | sort | prefix2header -n -u -s '::::\s+' | fmt ; }
 groupbyhost   () { prefixsort | prefix2header; }
 Paragraph () { sed -e "1i$1" | sed -e "1{p;s/./-/g};2,\$s/^/  /" -e '$a\\'; }
-info () { ifne ksh -c "echo '$INFO' | fmt; echo; cat;"; }
 
+export INFO
+info () { ifne ksh -c 'echo -n "$INFO" | fmt | sed -e "\$a\\\\"; cat;'; }
 
 # If not in a terminal, deliver report via email
 #[ ! -t 0 ] && OUT() { subjectise -t "$MAILTO" | ifne sendmail -t; }
@@ -122,14 +123,14 @@ do
 
 		n)  noop=echo ;;
 
-		I)  INFO="$INFO
-$OPTARG" ;;
+		I)  INFO="$INFO$OPTARG
+" ;;
 		T)  TITLE="$OPTARG" ;;
 		c)  iscmd=1 ;;
 		S)  SPATH="$OPTARG" ;;
 
 		e)  showerrors=show ;;
-		E)  showerrors= ;;
+		E)  showerrors=none ;;
 
 		R)  GROUPBY=results ;;
 		C)  GROUPBY=host ;;
@@ -181,8 +182,8 @@ then
 
 	# Default options from payload.
 	[ -z "$TITLE" ]        && TITLE=$(sed -n -e 's/^##[[:space:]]*title[[:space:]]//ip' "$PAYLOAD")
-	[ -z "$INFO" ]         && INFO=$(sed -n -e 's/^##[[:space:]]*info[[:space:]]//ip' "$PAYLOAD")
-	##[ -z "$INFO" ]         && INFO=$(sed -n -e 's/^##[[:space:]][[:space:]]*//p' "$PAYLOAD")
+	[ -z "$INFO" ]         && INFO=$(sed -n -e 's/^##[[:space:]]*info[[:space:]]//ip' "$PAYLOAD")"
+";
 	[ -z "$CLUSHTARGETS" ] && CLUSHTARGETS=$(sed -n -e 's/^##[[:space:]]*clush[[:space:]]//ip' "$PAYLOAD")
 	[ -z "$CLUSHOPT" ]     && CLUSHOPT=$(sed -n -e 's/^##[[:space:]]*clushopt[[:space:]]//ip' "$PAYLOAD")
 	[ -z "$GROUPBY" ]      && GROUPBY=$(sed -n -e 's/^##[[:space:]]*groupby[[:space:]]//ip' "$PAYLOAD")
@@ -191,7 +192,6 @@ then
 	[ -z "$POST" ]         && POST=$(sed -n -e 's/^##[[:space:]]*POST[[:space:]]//p' "$PAYLOAD")
 
 	# Set TITLE if not already set.
-	#[ -z "$TITLE" ] && TITLE=$(basename $1 | sed -e 's/-/ /g' -e 's/\b\(.\)/\u\1/g'  )
 	[ -z "$TITLE" ] && TITLE=$(basename $1 | sed -e 's/-\(.\)/ \u\1/g' -e 's/^./\u&/'  )
 
 	shift;
@@ -222,8 +222,11 @@ else
 	SHELLCMD="$@"
 fi
 
+# Reset info if it has no real content
+echo "$INFO" | grep '[^[:space:]]' > /dev/null || INFO=
+
 #Set the default for showerrors
-[ -z "$showerrors" ] && showerrors=show
+: ${showerrors:=show}
 
 # If the TITLE is just a dash, don't add a TITLE.
 [ "x-" = "x$TITLE" ] && Paragraph () { cat; }

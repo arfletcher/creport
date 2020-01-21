@@ -15,9 +15,27 @@
 
 # Payload
 
-# Vestigial command line
+# Defaults
+DIRS=
 quick=
-[ "x$1" = "x-q" ] && shift && quick=1
+
+# Command line
+usage="Usage: $0 [-h] [-q] [-d <dir>]"
+while getopts ":qhd:" arg
+do
+	case "$arg" in
+		q) quick=1 ;; # quick scan.
+		d) DIRS="$DIRS $OPTARG" ;;
+		h) echo $usage; exit 0 ;;
+
+		\:) echo "Missing option value for -$OPTARG" >&2 ; exit 1 ;;
+		\?) echo "Invalid option: -$OPTARG" >&2 ; exit 1 ;;
+	esac
+done
+shift $(($OPTIND - 1))
+
+# Default dirs to search.
+: ${DIRS:="/data /disc /export"}
 
 ACTIVE=$(mktemp) || exit 1
 trap '/bin/rm -f "$ACTIVE"' 0
@@ -34,7 +52,7 @@ waltz -f /var/polka/etc/waltz.conf -W |
 	sort | uniq > "$ACTIVE"
 
 # Look for any host reports not in the above list
-find /export /bimas -maxdepth 4 -name "\latest" 2>/dev/null |
+find $DIRS -maxdepth 4 -name "\latest" 2>/dev/null |
 	egrep waltz |
 	sed -e "s!/latest!!" |
 	sed -e 's/:[[:space:]]*/:/' |

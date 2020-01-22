@@ -1,9 +1,7 @@
 #!/bin/ksh
 
-# Get a report from multiple hosts using a individual script
-# distributed via clush.
-#
-# ARF November 2018
+# Get a post-processed report from multiple hosts using a individual
+# script distributed via clush.
 
 USAGE="$0 <options> <single-host-script> [<clush options>]
 
@@ -54,7 +52,6 @@ Post processing containing in script:
 
 Show errors via
 ## errors show
-## errors
 ## errors hide
 
 Post processing for results can be found in a script named
@@ -82,24 +79,22 @@ POST=
 showerrors=
 noop=
 INFO=
-
 DEFAULTCLUSHTARGETS="-a"
+ARGS=
 
 # Load system defaults
 RC=/etc/creport
 [ -f "$RC" ] && . "$RC"
 
-
-#NB The 'sort' command sorts differently depending on the LANG and LC_ALL env vars
-#   This will cause some grouped results to oddly split apart!
+# NB The 'sort' command sorts differently depending on the LANG and LC_ALL env vars
+#    This will cause some grouped results to oddly split apart!
 unset LANG LC_ALL LC_COLLATE
 
-# Set recipiant if we are not run in a terminal.
+# Set email recipient
 : ${MAILTO:=$LOGNAME}
 : ${MAILTO:=$USER}
 
-# Initialise
-ARGS=
+# Post-process functions.
 groupbyresult () { sed -e 's/^\([^:]*\): \(.*\)/\2:::: \1/' | sort | prefix2header -n -u -s '::::\s+' | fmt ; }
 groupbyhost   () { prefixsort | prefix2header; }
 Paragraph () { sed -e "1i$1" | sed -e "1{p;s/./-/g};2,\$s/^/  /" -e '$a\\'; }
@@ -110,7 +105,7 @@ info () { ifne ksh -c 'echo -n "$INFO" | fmt | sed -e "\$a\\\\"; cat;'; }
 # If not in a terminal, deliver report via email
 #[ ! -t 0 ] && OUT() { subjectise -t "$MAILTO" | ifne sendmail -t; }
 
-# GNU --help flag
+# GNU --help flag shortcut
 [ "x$1" = "x--help" ] && echo "$USAGE" && exit 0 
 
 # Parse command line.
@@ -156,34 +151,35 @@ shift $(($OPTIND - 1))
 [ ! -d "$SPATH" ] && echo "Script path does not exist!" && exit 1
 PATH=$SPATH:$PATH
 
-# usage
+# Usage with scriptlet list
 [ -z "$SHELLCMD" -a $# = 0 ] && echo "$USAGE" && find "$SPATH" -type f -executable -printf '%f\n' | column && exit 1
 
-# Report title, based on script name.
-
-if [ -z "$iscmd" ]
+# command or playload script?
+if [ ! -z "$iscmd" ]
 then
-	# Which report?
-	PAYLOAD=$(which $1 2>/dev/null)
-	#echo PATH=$PATH; echo PAYLOAD=$PAYLOAD
+	# It's just a straight command
+	SHELLCMD="$@"
+else
+	# It's a scriptlet
 
-	[ -z "$PAYLOAD" ] && echo "No such report as '$1'" && exit 1
+	# Find payload
+	! PAYLOAD=$(which $1 2>/dev/null) && echo "No such report as '$1'" && exit 1
+	#echo PATH=$PATH; echo PAYLOAD=$PAYLOAD
 
 	# Locate any scriptlet site data
 	DATAFILE="/etc/creport.d/$(basename $PAYLOAD)"
 
 	# What is the "shell" for the script?
-	SHELLCMD=$(sed -e '1 { s/^#!//;q}' "$PAYLOAD")
-	[ -z "$SHELLCMD" ] && SHELLCMD=/bin/ksh
+	SHELLCMD=$(sed -e '1 { s/^#! *//;q}' "$PAYLOAD")
+	: ${SHELLCMD:=/bin/ksh}
 
-	# Find the post processing script.
+	# Find any post processing script.
 	POST="${PAYLOAD}-post"
 	[ ! -x "$POST" ] && POST=
 
 	# Default options from payload.
 	[ -z "$TITLE" ]        && TITLE=$(sed -n -e 's/^##[[:space:]]*title[[:space:]]//ip' "$PAYLOAD")
-	[ -z "$INFO" ]         && INFO=$(sed -n -e 's/^##[[:space:]]*info[[:space:]]//ip' "$PAYLOAD")"
-";
+	[ -z "$INFO" ]         && INFO=$(sed -n -e 's/^##[[:space:]]*info[[:space:]]//ip' "$PAYLOAD")
 	[ -z "$CLUSHTARGETS" ] && CLUSHTARGETS=$(sed -n -e 's/^##[[:space:]]*clush[[:space:]]//ip' "$PAYLOAD")
 	[ -z "$CLUSHOPT" ]     && CLUSHOPT=$(sed -n -e 's/^##[[:space:]]*clushopt[[:space:]]//ip' "$PAYLOAD")
 	[ -z "$GROUPBY" ]      && GROUPBY=$(sed -n -e 's/^##[[:space:]]*groupby[[:space:]]//ip' "$PAYLOAD")
@@ -192,7 +188,7 @@ then
 	[ -z "$POST" ]         && POST=$(sed -n -e 's/^##[[:space:]]*POST[[:space:]]//p' "$PAYLOAD")
 
 	# Set TITLE if not already set.
-	[ -z "$TITLE" ] && TITLE=$(basename $1 | sed -e 's/-\(.\)/ \u\1/g' -e 's/^./\u&/'  )
+	: ${TITLE:=$(basename $1 | sed -e 's/-\(.\)/ \u\1/g' -e 's/^./\u&/'  ) }
 
 	shift;
 
@@ -215,20 +211,26 @@ then
 			done
 			ARGS="import sys; sys.argv = ('${PAYLOAD}' $ARGS);"
 		;;
-		*) echo "Don't know how to deliver argumments for $SHELLCMD" >&2 ;;
+		*) echo "Don't know how to deliver arguments for $SHELLCMD" >&2 ;;
 	esac
-else
-	# It's just a straight command
-	SHELLCMD="$@"
 fi
 
 # Reset info if it has no real content
 echo "$INFO" | grep '[^[:space:]]' > /dev/null || INFO=
 
-#Set the default for showerrors
+# Set some defaults
 : ${showerrors:=show}
+: ${POSTCMD:=cat}
+: ${POST:=cat}
+: ${TITLE:=Report}
+: ${CLUSHTARGETS:="$DEFAULTCLUSHTARGETS"}
 
-# If the TITLE is just a dash, don't add a TITLE.
+# Create functions
+eval "postcmd () { $POSTCMD; }"
+eval "POST () { $POST; }"
+
+# If the TITLE is just a dash, don't add a TITLE nor indent.
+# This allows one-paragraph per host, non-indented reports
 [ "x-" = "x$TITLE" ] && Paragraph () { cat; }
 
 # How to group the results in the final output.
@@ -241,33 +243,20 @@ then
 	esac
 fi
 
-[ -z "$POSTCMD" ] && POSTCMD=cat
-eval "postcmd () { $POSTCMD; }"
-
-[ -z "$POST" ] && POST=cat
-eval "POST () { $POST; }"
-
-
-[ -z "$TITLE" ] && TITLE=Report
-[ -z "$CLUSHTARGETS" ] && CLUSHTARGETS="$DEFAULTCLUSHTARGETS"
-
-# Remaining args are for the script 
-#echo args: $# $@
-
 # Error reporting.
 ERRORS=$(mktemp)
 trap '/bin/rm -f "$ERRORS"' 0
 
 # Run the report everywhere
 {
-	#[ ! -z "$noop" ] && echo clush $CLUSHOPT "$@" -- $SHELLCMD $@
+	# Report and format report
 	echo "$ARGS" |
 	cat - "$DATAFILE" "$PAYLOAD" 2>/dev/null | 
 		$noop clush $CLUSHOPT $CLUSHTARGETS -- $SHELLCMD 2>"$ERRORS" |
 		postcmd | 
 		$collect
 
-	#nl "$ERRORS"
+	# Errors
 	if [ "x$showerrors" = "xshow" ]
 	then
 		# Collect different types of clush and ssh errors.
@@ -296,6 +285,7 @@ trap '/bin/rm -f "$ERRORS"' 0
 	fi
 
 } |
+# Post-process
 	info |
 	Paragraph "$TITLE" |
 	POST |

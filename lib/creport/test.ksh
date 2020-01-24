@@ -1,6 +1,6 @@
 #!/bin/ksh
 
-## creport test script title
+## title creport test script title
 
 ## Double hash comment
 # Single hash comment
@@ -12,7 +12,6 @@
 ## post sed -e 's/$/%/' -e 's/:/-:/'
 ## clushopt --pick=7
 ## POST titlesummary '@CentOS'
-## errors show
 
 echo "Test script $0 $@";
 

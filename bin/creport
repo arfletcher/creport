@@ -97,9 +97,9 @@ unset LANG LC_ALL LC_COLLATE
 # Post-process functions.
 groupbyresult () { sed -e 's/^\([^:]*\): \(.*\)/\2:::: \1/' | sort | prefix2header -n -u -s '::::\s+' | fmt ; }
 groupbyhost   () { prefixsort | prefix2header; }
-Paragraph () { sed -e "1i$1" | sed -e "1{p;s/./-/g};2,\$s/^/  /" -e '$a\\'; }
+Paragraph () { sed -e "1i$1" | sed -e "1{p;s/./=/g};2,\$s/^/  /" -e '$a\\'; }
 
-export INFO
+export INFO FMT
 info () { ifne ksh -c 'echo -n "$INFO" | fmt | sed -e "\$a\\\\"; cat;'; }
 
 # If not in a terminal, deliver report via email

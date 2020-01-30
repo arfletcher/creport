@@ -88,7 +88,7 @@ RC=/etc/creport
 
 # NB The 'sort' command sorts differently depending on the LANG and LC_ALL env vars
 #    This will cause some grouped results to oddly split apart!
-unset LANG LC_ALL LC_COLLATE
+unset LANG $(env | egrep LC_ | sed -e 's/=.*//')
 
 # Set email recipient
 : ${MAILTO:=$LOGNAME}

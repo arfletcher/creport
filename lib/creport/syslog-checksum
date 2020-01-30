@@ -1,0 +1,92 @@
+#!/usr/bin/perl
+
+# Create SHA1 checksum of all syslog for yesterhour or yesterday,
+
+# Requires these packages.
+# apt -y install libdigest-sha-perl
+# yum -y install perl-Digest-SHA
+
+# creport
+# sort the lines by host logs (field 2), count by uniq fields (2+) and remove dups.
+# If two syslog hosts report the same logs then no output
+##post sort -k2 | uniq -c -f2 | sed -e '/^ *2/d' | column -t
+
+# NB: if you have systems in different timezones you need to set the offset
+# large enough that you can capture logs for the matching date. For example,
+# for GB and US/EST hosts use an offset of at least 6.
+
+use 5;
+use strict;
+use warnings;
+
+use POSIX;
+use Data::Dumper;
+use Digest::SHA  qw(sha1 sha1_hex sha1_base64);
+use Getopt::Std;
+
+# Initialise
+my $fmt = '%b %e %H:\d\d:\d\d';
+sub verbose { 1; }
+
+# Parse command line
+my $usage = "Usage: $0 [-v] [-o <offset>] [-d] <hosts>*\n";
+my %flag = (
+		o => 6,	# offset (hours)
+		v => 0,	# verbosity
+		d => 0,	# whole day rather than an hour
+);
+getopts('vo:d', \%flag) || die $usage;
+
+if ($flag{v}) { eval 'no warnings; sub verbose { print STDERR @_; }'; }
+if ($flag{d}) { $fmt = '%b %e \d\d:\d\d:\d\d'; }
+
+# Match
+my $match = POSIX::strftime($fmt, gmtime(time-$flag{o}*3600));
+
+# hosts to keep
+my %keep = map { $_ => 1 } split(/,/, join(',', @ARGV));
+
+# Files
+@ARGV=  
+	sort { (stat($a))[9] <=> (stat($b))[9]; }
+	map { glob($_ . '*'); }
+      	grep { -f } 
+	qw(
+		/var/log/secure
+		/var/log/messages
+
+		/var/log/auth.log
+		/var/log/syslog
+	);
+
+verbose "grep -P '$match'\t", join(" ", @ARGV), "\n";
+
+# Extract the logs for each host
+my %sum;
+my %lines;
+while (<>)
+{
+	# Extract logs of interest
+	next unless /^($match)\s(\S+)\s/;
+	my $m = $1;
+	my $h = $2;
+
+	# only keep interesting hosts
+	next if (%keep and !exists($keep{$h}));
+
+	# Fix up lines
+	#s/( org.gnome.Shell.desktop\[\d+\]) /$1: /;
+	# Solution: exclude from logs.
+
+	# Add to check sums.
+	$lines{$h} ++;
+	$sum{$h} //= Digest::SHA->new;
+	$sum{$h}->add($_);
+}
+
+# Report all the checksums.
+for my $h (sort keys %sum)
+{
+	print join("\t", $h, $lines{$h}, $sum{$h}->b64digest), "\n";
+}
+

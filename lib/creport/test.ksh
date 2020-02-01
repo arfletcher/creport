@@ -5,8 +5,8 @@
 ## Double hash comment
 # Single hash comment
 
-## Info This is a test script (info line).
-## Info Line 2 of the info.
+### This is a test script (info line).
+### Line 2 of the info.
 
 ## groupby results
 ## post sed -e 's/$/%/' -e 's/:/-:/'

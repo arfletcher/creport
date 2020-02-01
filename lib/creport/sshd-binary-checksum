@@ -1,7 +1,7 @@
 #!/bin/ksh
 
 ### Quick checksum check on sshd binaries.
-### If needed, update the list of checksums in sshd-binary-checksum.ok
+### If verified, update the list of checksums in sshd-binary-checksum.ok
 
 # Most of
 # the work is done on the admin server side rather than the client,

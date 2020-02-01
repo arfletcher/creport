@@ -1,6 +1,9 @@
 #!/bin/ksh
 
-# This is a quick check on sshd binaries accross our systems. Most of
+### Quick checksum check on sshd binaries.
+### If needed, update the list of checksums in sshd-binary-checksum.ok
+
+# Most of
 # the work is done on the admin server side rather than the client,
 # because we can't trust the client. Can we trust the admin server?
 #
@@ -12,7 +15,6 @@
 ##errors hide
 ##post    run-per-prefix ksh -x 'base64 -d | sha256sum' | sed -e 's/ -$//' | grep -v -f  <(sed -e 's/[[:space:]].*//' "$PAYLOAD.ok")
 
-##info If needed, update the list of checksums in sshd-binary-checksum.ok
 ##groupby results
 
 base64 /usr/sbin/sshd

@@ -39,7 +39,8 @@ Options:
 	-x <nodes> Exclude these nodes
 
 Default information can be added via 
-##Info .....
+### ..... information ...
+### ..... information ...
 
 Default clush options can be specifiedin the script via
 ##clushopt <options>
@@ -100,7 +101,8 @@ groupbyhost   () { prefixsort | prefix2header; }
 Paragraph () { sed -e "1i$1" | sed -e "1{p;s/./=/g};2,\$s/^/  /" -e '$a\\'; }
 
 export INFO FMT
-info () { ifne ksh -c 'echo -n "$INFO" | fmt | sed -e "\$a\\\\"; cat;'; }
+#info () { ifne ksh -c 'echo -n "$INFO" | fmt | sed -e "\$a\\\\"; cat;'; }
+info () { ifne ksh -c 'echo -n "$INFO" | pandoc  -f markdown -t plain | sed -e "\$a\\\\"; cat;'; }
 
 # If not in a terminal, deliver report via email
 #[ ! -t 0 ] && OUT() { subjectise -t "$MAILTO" | ifne sendmail -t; }
@@ -178,8 +180,12 @@ else
 	[ ! -x "$POST" ] && POST=
 
 	# Default options from payload.
+	[ -z "$TITLE" ]        && TITLE=$(sed -n -e '/###[[:space:]]==*/ { x; s/^[#[:space:]]*//; p; q; }; h' "$PAYLOAD")
 	[ -z "$TITLE" ]        && TITLE=$(sed -n -e 's/^##[[:space:]]*title[[:space:]]//ip' "$PAYLOAD")
+
+	[ -z "$INFO" ]         && INFO=$(sed -n ' /^###/,/\(^$\|^[^#]\|^#[^#]\)/ { /\(^$\|^[^#]\|^#[^#]\)/  q; p }' "$PAYLOAD" | sed -e 's/^##* *//' )
 	[ -z "$INFO" ]         && INFO=$(sed -n -e 's/^##[[:space:]]*info[[:space:]]//ip' "$PAYLOAD")
+
 	[ -z "$CLUSHTARGETS" ] && CLUSHTARGETS=$(sed -n -e 's/^##[[:space:]]*clush[[:space:]]//ip' "$PAYLOAD")
 	[ -z "$CLUSHOPT" ]     && CLUSHOPT=$(sed -n -e 's/^##[[:space:]]*clushopt[[:space:]]//ip' "$PAYLOAD")
 	[ -z "$GROUPBY" ]      && GROUPBY=$(sed -n -e 's/^##[[:space:]]*groupby[[:space:]]//ip' "$PAYLOAD")

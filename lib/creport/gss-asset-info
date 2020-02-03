@@ -146,7 +146,7 @@ lsb_release -sr | linejoin Patch_Level
 
 # Disc
 lsblk -Sn -o SIZE 2>/dev/null | sort -h | uniq -c |sed -e 's/^  *//' -e 's/  */x/' -e 's/1x//' | linejoin Disc
-df -lh --output=source,size 2>/dev/mull | sed -n -e 's!^/dev/.*[[:space:]]!!p' | sort -h | uniq -c |sed -e 's/^  *//' -e 's/  */x/' -e 's/1x//' | linejoin Storage
+df -lh --output=source,size 2>/dev/null | sed -n -e 's!^/dev/.*[[:space:]]!!p' | sort -h | uniq -c |sed -e 's/^  *//' -e 's/  */x/' -e 's/1x//' | linejoin Storage
 
 # PII.... based on a file
 { [ -f /etc/PII ] && echo Yes || echo No; } | linejoin PII

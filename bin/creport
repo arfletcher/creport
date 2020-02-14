@@ -217,6 +217,16 @@ else
 			done
 			ARGS="import sys; sys.argv = ('${PAYLOAD}' $ARGS);"
 		;;
+
+		*/php)
+			ARGS="'${PAYLOAD}'"
+			for a
+			do
+				ARGS="$ARGS, '$a'" 
+			done
+			ARGS="<?php \$argv = array($ARGS); ?>"
+		;;
+
 		*) echo "Don't know how to deliver arguments for $SHELLCMD" >&2 ;;
 	esac
 fi

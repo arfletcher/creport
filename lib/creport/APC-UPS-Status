@@ -15,13 +15,34 @@
 # Look to see if there is a UPS attaced via USB
 lsusb | egrep Uninterruptible > /dev/null || exit 0
 
-# Report status
-echo HOST	$(hostname -s)
+# Just in case
+echo HOST       $(hostname -s)
+
+# Report status for any UPS we can find.
+
+# APC
 apcaccess 2>/dev/null | 
 	sed -e 's/[[:space:]]*:[[:space:]]*/	/' -e 's/[[:space:]]Percent/%/gi' -e 's/ Cable//' -e 's/Custom //' -e 's/[[:space:]]*$//' -e 's/ /,/g' |
-	egrep '^(HOST|STATUS|CABLE|BATTDATE|LOADPCT)[[:space:]]'
+	egrep '^(HOST|STATUS|CABLE|BATTDATE|LOADPCT)[[:space:]]' |
+	sed -e "1iHOST $(hostname -s)" -e '$a\\'
 
-# Finish the stanza
+# NUT
+upsc -l 2>/dev/null | while read UPS
+do
+	echo HOST	$(hostname -s)
+	upsc "$UPS" 2>&1 | sed -n \
+	-e 's/OL/ONLINE/' \
+	-e 's/ups.load:.*/&%/' \
+	-e 's/ups.status:/STATUS/p' \
+	-e 's/battery.date:/BATTDATE/p' \
+	-e 's/ups.load:/LOADPCT/p' \
+	-e 's/driver.name:/CABLE/p' \
+
+	# Finish the stanza
+	echo
+done
+
+# Just in case
 echo
 
 exit

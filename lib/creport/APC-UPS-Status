@@ -8,7 +8,7 @@
 # ARF 03 November 2018
 
 ## clushopt -LNq
-## post stanza2tab 'HOST STATUS CABLE BATTDATE LOADPCT' | column -t
+## post stanza2tab 'HOST TYPE UPSNAME CABLE STATUS BATTDATE LOADPCT' | column -t
 
 # Payload
 
@@ -23,13 +23,16 @@ echo HOST       $(hostname -s)
 # APC
 apcaccess 2>/dev/null | 
 	sed -e 's/[[:space:]]*:[[:space:]]*/	/' -e 's/[[:space:]]Percent/%/gi' -e 's/ Cable//' -e 's/Custom //' -e 's/[[:space:]]*$//' -e 's/ /,/g' |
-	egrep '^(HOST|STATUS|CABLE|BATTDATE|LOADPCT)[[:space:]]' |
-	sed -e "1iHOST $(hostname -s)" -e '$a\\'
+	egrep '^(HOST|UPSNAME|STATUS|CABLE|BATTDATE|LOADPCT)[[:space:]]' |
+	sed -e "1iHOST $(hostname -s)" -e '1iTYPE apcupsd' -e '$a\\'
 
 # NUT
 upsc -l 2>/dev/null | while read UPS
 do
 	echo HOST	$(hostname -s)
+	echo UPSNAME	$UPS
+	echo TYPE	NUT
+
 	upsc "$UPS" 2>&1 | sed -n \
 	-e 's/OL/ONLINE/' \
 	-e 's/ups.load:.*/&%/' \

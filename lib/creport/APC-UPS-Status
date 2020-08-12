@@ -37,7 +37,7 @@ do
 	-e 's/OL/ONLINE/' \
 	-e 's/ups.load:.*/&%/' \
 	-e 's/ups.status:/STATUS/p' \
-	-e 's/battery.date:/BATTDATE/p' \
+	-e 's/battery.mfr.date:/BATTDATE/p' \
 	-e 's/ups.load:/LOADPCT/p' \
 	-e 's/driver.name:/CABLE/p' \
 

@@ -207,9 +207,7 @@ else
 
 	# Deal with script arguments, if there are any.
 	ARGS=
-	if [ $# != 0 ]
-	then
-		case "$SHELLCMD" in
+	case "$SHELLCMD" in
 		*sh*)	ARGS="set -- $@" ;;
 		*perl*)	
 			for a
@@ -236,9 +234,10 @@ else
 			ARGS="<?php \$argv = array($ARGS); ?>"
 		;;
 
-		*) echo "Don't know how to deliver arguments for $SHELLCMD" >&2; exit 1 ;;
-		esac
-	fi
+		*)
+			[ $# != 0 ] && echo "Don't know how to deliver arguments for $SHELLCMD" >&2 && exit 1 
+		;;
+	esac
 fi
 
 # Reset info if it has no real content

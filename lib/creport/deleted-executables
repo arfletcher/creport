@@ -51,6 +51,7 @@ RESTART () {
 
 	grep "$1" $TMP | sed -e 's/[[:space:]].*//' |
 		xargs -I_ ps -hounit _ |
+		sort | uniq |
 		egrep -v '^user@' | egrep -v '^session' |
 		xargs -I_ systemctl restart _
 }
@@ -73,6 +74,8 @@ then
 	RESTART rpc.statd
 	RESTART rpc.gssd
 	RESTART accounts-daemon
+	RESTART lsm
+	RESTART systemd-machined
 
 	#RESTART pulseaudio # this kills user sessions!!!!
 	#RESTART ssh-agent

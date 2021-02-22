@@ -190,7 +190,7 @@ echo "$VM $CPUS cpus ${MEM}GB RAM" | linejoin Description
 
 ########################################################
 # Admins (taken from sudoers-report)
-sed -e '/^Defaults/d' -e '/^#/d' -e '/^$/d' -e 's/#.*//' /etc/sudoers /etc/sudoers.d/* |
+sed -e '/^Defaults/d' -e '/^#/d' -e '/^$/d' -e 's/#.*//' /etc/sudoers /etc/sudoers.d/* 2>/dev/null |
 	sed -e 's/[[:space:]].*//' |
 	sort | uniq | egrep . |
 	while read first

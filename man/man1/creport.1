@@ -14,25 +14,31 @@
 .SH "NAME"
 creport \- Run  script on a collection of remote systems using clush and collect the results as a report.
 .SH "SYNOPSIS"
-.HP \w'\fBifne\ [\-n]\ command\fR\ 'u
-\fBifne [\-n] command\fR
+.HP \w'\fBcreport\ [\-options]\ command\fR\ 'u
+\fBcreport [\-options] command\fR
 .SH "DESCRIPTION"
 .PP
-\fBifne\fR
-runs the following command if and only if the standard input is not empty\&.
+\fBcreport\fR
+runs the following command on all the target hosts via clush and collects the results as a configurable report.
 .SH "OPTIONS"
+
 .PP
-\fB\-n\fR
+\fB\-a\fR
 .RS 4
-Reverse operation\&. Run the command if the standard input is empty\&.
-.sp
-Note that if the standard input is not empty, it is passed through ifne in this case\&.
+Run on all hosts (same as clush option).
 .RE
+
+.PP
+\fB\-w <clush-hosts>\fR
+.RS 4
+Run on all specified hosts (same as clush option).
+.RE
+
 .SH "EXAMPLE"
-.HP \w'\fBfind\ \&.\ \-name\ core\ |\ ifne\ mail\ \-s\ "Core\ files\ found"\ root\fR\ 'u
-\fBfind \&. \-name core | ifne mail \-s "Core files found" root\fR
+.HP \w'\fBcreport\ \&-a\ date\fR\ 'u
+\fBcreport\ \&-a date\fR
 .SH "AUTHOR"
 .PP
-Copyright 2008 by Javier Merino <cibervicho@gmail\&.com>
+Copyright 2020- by Anthony Fletcher
 .PP
 Licensed under the GNU GPL

@@ -27,8 +27,10 @@ use POSIX;
 use Data::Dumper;
 use Digest::SHA  qw(sha1 sha1_hex sha1_base64);
 use Getopt::Std;
+use Sys::Hostname;
 
 # Initialise
+my $H = hostname;
 my $fmt = '%b %e %H:\d\d:\d\d';
 sub verbose { 1; }
 
@@ -68,17 +70,20 @@ my %keep = map { $_ => 1 } split(/,/, join(',', @ARGV));
 		/var/log/syslog
 	);
 
-verbose "grep -hP '$match'\t", join(" ", @ARGV), "\n";
+my $scmd = join(' ', "grep -hP '$match'", @ARGV) . "\n";
+verbose $scmd;
 
 # Extract the logs for each host
 my %count;
 my %lines;
 while (<>)
 {
-	# Extract logs of interest
+	# Extract logs of interest, ie that match the "match".
 	next unless /^($match)\s(\S+)\s/;
-	my $m = $1;
-	my $h = $2;
+
+	# Now match the host the date.....
+	next unless (/^\S+\s+\d+\s+\d\d:\d\d:\d\d\s+(\S+)/);
+	my $h = $1;
 
 	# only keep interesting hosts
 	next if (%keep and !exists($keep{$h}));
@@ -86,6 +91,21 @@ while (<>)
 	# Fix up lines
 	#s/( org.gnome.Shell.desktop\[\d+\]) /$1: /;
 	# Solution: exclude from logs.
+
+	# Some messages have too long a "tag" for rsyslog; truncate
+	if (/^(\S+\s+\d+\s+\d\d:\d\d:\d\d\s+\S+\s+)([^\s]+)(\s+.*)/)
+	{
+		my $start = $1;
+		my $tag = $2;
+
+		if (length($tag) > 30)
+		{
+			$tag = substr( $tag, 0, 30 );
+			#warn "old $_";
+			$_ = $1 . $tag . $3;
+			#die "new $_"
+		}
+	}
 
 	# Remember the lines
 	$count{$h} ++;
@@ -101,7 +121,13 @@ for my $h (sort keys %count)
 	$sum -> add(sort @{$lines{$h}});
 
 	# Debugging - save logs
-	if ($flag{D}) { open (LOG, '>>', "/tmp/syslog-$h.$$.log"); print LOG @{$lines{$h}}; }
+	if ($flag{D})
+	{
+		open (LOG, '>>', "/tmp/syslog-$H-$h.$$.log");
+		if ($flag{v}) { print LOG $scmd; }
+		print LOG @{$lines{$h}};
+		close LOG;
+	}
 
 	# Results
 	print join("\t", $h, $count{$h}, $sum->b64digest), "\n";

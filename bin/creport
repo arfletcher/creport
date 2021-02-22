@@ -3,7 +3,7 @@
 # Get a post-processed report from multiple hosts using a individual
 # script distributed via clush.
 
-USAGE="$0 <options> <single-host-script> [<clush options>]
+USAGE="$0 <options> <single-host-script> [<script options>]
 
 Options:
 	-h          Help message
@@ -14,7 +14,7 @@ Options:
 	-c          Run the specified command instead of a scriptlet
 	-n          Noop mode
 
-	-M          Send report via email to \$MAILTO, or \$USER.
+	-M          Send report via email to environment vars \$MAILTO, or \$USER.
 
 	Error display
 	-E          Don't report any script error messages
@@ -38,26 +38,33 @@ Options:
 	-w <nodes> Specified clush nodelist
 	-x <nodes> Exclude these nodes
 
-Default information can be added via 
-### ..... information ...
-### ..... information ...
+The user's PATH is search for the specified script. The relative
+directory ../lib/creport is added to the PATH first. Script options
+follow the script name.
 
-Default clush options can be specifiedin the script via
-##clushopt <options>
+Each script can have a default set of options via 'magic' comments
+inside the script as follows:
 
-Default clush targets can be specifiedin the script via
-##clush [-w <...>] [-x <...>] [-a]
+Default summary information can be added via 
+  ### ..... information ...
+  ### ..... information ...
+
+Default clush options can be specified in the script via
+  ##clushopt <options>
+
+Default clush targets can be specified in the script via
+  ##clush [-w <...>] [-x <...>] [-a]
 
 Post processing containing in script:
-##post <shell command>
+  ##post <shell command>
 
-Show errors via
-## errors show
-## errors hide
+Show errors or not via
+  ## errors show
+  ## errors hide
 
-Post processing for results can be found in a script named
+By default, the cumulative results are post processing via a script named
 	<single-host-script>-post
-Also can be set via
+Also this can be set via
 ##POST <shell command>
 
 Invocation: $0 $@
@@ -198,9 +205,11 @@ else
 
 	shift;
 
-	# Deal with script arguments.
+	# Deal with script arguments, if there are any.
 	ARGS=
-	case "$SHELLCMD" in
+	if [ $# != 0 ]
+	then
+		case "$SHELLCMD" in
 		*sh*)	ARGS="set -- $@" ;;
 		*perl*)	
 			for a
@@ -227,8 +236,9 @@ else
 			ARGS="<?php \$argv = array($ARGS); ?>"
 		;;
 
-		*) echo "Don't know how to deliver arguments for $SHELLCMD" >&2 ;;
-	esac
+		*) echo "Don't know how to deliver arguments for $SHELLCMD" >&2; exit 1 ;;
+		esac
+	fi
 fi
 
 # Reset info if it has no real content

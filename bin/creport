@@ -28,7 +28,7 @@ Options:
 	-L         disable header block and order output by nodes
 	-b         display gathered results
 	-B         display gathered results
-	-N         disable labeling of command line
+	-N         disable labelling of command line
 	-q         quiet clush output
 
 	-P <num>   same as --pick=<num>
@@ -107,7 +107,9 @@ groupbyresult () { sed -e 's/^\([^:]*\): \(.*\)/\2:::: \1/' | sort | prefix2head
 groupbyhost   () { prefixsort | prefix2header; }
 Paragraph () { sed -e "1i$1" | sed -e "1{p;s/./=/g};2,\$s/^/  /" -e '$a\\'; }
 
-export INFO FMT
+# Format the info via markdown using pandoc
+# but only if there is input text.
+export INFO
 #info () { ifne ksh -c 'echo -n "$INFO" | fmt | sed -e "\$a\\\\"; cat;'; }
 info () { ifne ksh -c 'echo -n "$INFO" | pandoc  -f markdown -t plain | sed -e "\$a\\\\"; cat;'; }
 
@@ -186,13 +188,20 @@ else
 	POST="${PAYLOAD}-post"
 	[ ! -x "$POST" ] && POST=
 
+	###################################
 	# Default options from payload.
-	[ -z "$TITLE" ]        && TITLE=$(sed -n -e '/###[[:space:]]==*/ { x; s/^[#[:space:]]*//; p; q; }; h' "$PAYLOAD")
+
+	# Grab title as from the first ### block text: line before a line of =====
+	[ -z "$TITLE" ]        && TITLE=$(sed -n -e '/###[[:space:]]*===*/ { x; s/^[#[:space:]]*//; p; q; }; h' "$PAYLOAD")
+	# Grab title from a line that starts ##<space>title
 	[ -z "$TITLE" ]        && TITLE=$(sed -n -e 's/^##[[:space:]]*title[[:space:]]//ip' "$PAYLOAD")
 
-	[ -z "$INFO" ]         && INFO=$(sed -n ' /^###/,/\(^$\|^[^#]\|^#[^#]\)/ { /\(^$\|^[^#]\|^#[^#]\)/  q; p }' "$PAYLOAD" | sed -e 's/^##* *//' )
+	# Grab info from first ### block
+	[ -z "$INFO" ]         && INFO=$(sed -n '/^###/,$ { /^###/ !q; s/^###[[:space:]]*//p }' "$PAYLOAD")
+	# Grab info from any lines that start ##<space>info<space>
 	[ -z "$INFO" ]         && INFO=$(sed -n -e 's/^##[[:space:]]*info[[:space:]]//ip' "$PAYLOAD")
 
+	# Embedded creport options
 	[ -z "$CLUSHTARGETS" ] && CLUSHTARGETS=$(sed -n -e 's/^##[[:space:]]*clush[[:space:]]//ip' "$PAYLOAD")
 	[ -z "$CLUSHOPT" ]     && CLUSHOPT=$(sed -n -e 's/^##[[:space:]]*clushopt[[:space:]]//ip' "$PAYLOAD")
 	[ -z "$GROUPBY" ]      && GROUPBY=$(sed -n -e 's/^##[[:space:]]*groupby[[:space:]]//ip' "$PAYLOAD")

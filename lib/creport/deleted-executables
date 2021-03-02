@@ -76,6 +76,7 @@ then
 	RESTART accounts-daemon
 	RESTART lsm
 	RESTART systemd-machined
+	RESTART ibus-daemon
 
 	#RESTART pulseaudio # this kills user sessions!!!!
 	#RESTART ssh-agent

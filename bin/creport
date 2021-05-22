@@ -89,6 +89,7 @@ noop=
 INFO=
 DEFAULTCLUSHTARGETS="-a"
 ARGS=
+CLUSHEXTOPT="-u 300"
 
 # Load system defaults
 RC=/etc/creport
@@ -291,7 +292,7 @@ trap '/bin/rm -f "$ERRORS"' 0
 	# Report and format report
 	echo "$ARGS" |
 	cat - "$DATAFILE" "$PAYLOAD" 2>/dev/null | 
-		$noop clush $CLUSHOPT $CLUSHTARGETS -- $SHELLCMD 2>"$ERRORS" |
+		$noop clush $CLUSHEXTOPT $CLUSHOPT $CLUSHTARGETS -- $SHELLCMD 2>"$ERRORS" |
 		postcmd | 
 		$collect
 

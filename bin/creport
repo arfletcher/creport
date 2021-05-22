@@ -29,6 +29,7 @@ Options:
 	-b         display gathered results
 	-B         display gathered results
 	-N         disable labelling of command line
+	-u         command timeout
 	-q         quiet clush output
 
 	-P <num>   same as --pick=<num>
@@ -125,7 +126,7 @@ info () { ifne ksh -c 'echo -n "$INFO" | pandoc  -f markdown -t plain | sed -e "
 [ "x$1" = "x--help" ] && echo "$USAGE" && exit 0 
 
 # Parse command line.
-while getopts ":hnI:T:cS:eERCaw:x:LBbqNMP:Z" optchar
+while getopts ":hnI:T:cS:eERCaw:x:LBbqNMP:Zu:" optchar
 do
 	#echo "option $optchar"
 	case "$optchar" in
@@ -149,6 +150,7 @@ do
 		M)  OUT() { subjectise -t "$MAILTO" | ifne sendmail -t; } ;;
 
 		[LbBqB])  CLUSHOPT="$CLUSHOPT -$optchar" ;;
+		[u])  CLUSHOPT="$CLUSHOPT -$optchar $OPTARG" ;;
 		P)  CLUSHOPT="$CLUSHOPT --pick=$OPTARG" ;;
 
 		a)     CLUSHTARGETS="$CLUSHTARGETS -$optchar" ;;

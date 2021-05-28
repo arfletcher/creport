@@ -1,0 +1,49 @@
+#!/bin/ksh
+
+### Set random root password and print to stdout.
+### Run via creport, save passwords to a root owned file.
+### Excluded from master host $(hostname)
+### Date $(date)
+
+# Usage:
+#creport set-root-password [<user>]
+# Then look in /root/passwords/ROOT-*
+#  ARF 11 April 2021
+
+
+## clush -a -x $(hostname -f),$(hostname -s)
+## post sort > /root/passwords/ROOT-$(date +%FT%T)
+
+uname -n; exit
+
+# Install pwgen as needed
+{
+if ! type pwgen >/dev/null
+then
+	yum -y install pwgen
+	apt -y install pwgen
+fi
+} >/dev/null 2>/dev/null
+
+# Sanity check
+! which pwgen  > /dev/null && exit 
+! which chpasswd > /dev/null && exit
+
+# Default to the user
+[ $# = 0 ] && set -- $(id -un)
+
+
+# Get a random password for the each specified user, set it and echo it on stdout
+# Check that it isn't "<user>:", the worst of all failures.
+{
+	for U
+	do
+		echo -n "$U:"
+		pwgen -y 15 
+	done
+} | grep -v ':$' | tee >(chpasswd) 
+
+
+# create a random string:
+# tr -dc '0-9a-zA-Z' < /dev/urandom | fold -w15 | head -n1
+

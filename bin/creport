@@ -267,6 +267,10 @@ echo "$INFO" | grep '[^[:space:]]' > /dev/null || INFO=
 : ${TITLE:=Report}
 : ${CLUSHTARGETS:="$DEFAULTCLUSHTARGETS"}
 
+# Expand cluster targets, so we can do dynamic excludes and includes
+# E.g. -a -x $(hostname -s),$(hostname -f)
+CLUSHTARGETS=$(eval echo "$CLUSHTARGETS")
+
 # Create functions
 eval "postcmd () { $POSTCMD; }"
 eval "POST () { $POST; }"

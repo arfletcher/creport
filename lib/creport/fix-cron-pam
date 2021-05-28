@@ -18,7 +18,7 @@ lsb_release -d | ! egrep 'CentOS|Red Hat' > /dev/null && exit
 egrep "^$DATE" /var/log/cron | ! egrep 'FAILED to authorize' > /dev/null && exit
 
 # Has it been fixed recently?
-egrep pam_rootok /etc/pam.d/crond > /dev/null && echo Already fixed && exit
+egrep 'auth.*pam_rootok' /etc/pam.d/crond > /dev/null && echo Already fixed && exit
 
 # Fix it
 sed -i.dist -e '1i#Fix cron for root - ARF \

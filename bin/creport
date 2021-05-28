@@ -92,6 +92,16 @@ DEFAULTCLUSHTARGETS="-a"
 ARGS=
 CLUSHEXTOPT="-u 300"
 
+# Expansion function
+# LINES=$(Expand "$LINES")
+Expand() {
+    data="$1"
+    end=c96db9b66089aed5fd4ec6d530cc567d
+    command="cat <<$end"$'\n'"$data"$'\n'"$end"
+    eval "$command"
+}
+
+
 # Load system defaults
 RC=/etc/creport
 [ -f "$RC" ] && . "$RC"
@@ -116,6 +126,7 @@ Paragraph1 () { sed -e "1i$1" | sed -e "1{p;s/./=/g};2,\$s/^/  /" -e '$a\\'; }
 # Format the info via markdown using pandoc
 # but only if there is input text.
 export INFO
+
 #info () { ifne ksh -c 'echo -n "$INFO" | fmt | sed -e "\$a\\\\"; cat;'; }
 info () { ifne ksh -c 'echo -n "$INFO" | pandoc  -f markdown -t plain | sed -e "\$a\\\\"; cat;'; }
 
@@ -260,6 +271,9 @@ fi
 # Reset info if it has no real content
 echo "$INFO" | grep '[^[:space:]]' > /dev/null || INFO=
 
+# Expand info
+INFO=$(Expand "$INFO")
+
 # Set some defaults
 : ${showerrors:=show}
 : ${POSTCMD:=cat}
@@ -269,7 +283,7 @@ echo "$INFO" | grep '[^[:space:]]' > /dev/null || INFO=
 
 # Expand cluster targets, so we can do dynamic excludes and includes
 # E.g. -a -x $(hostname -s),$(hostname -f)
-CLUSHTARGETS=$(eval echo "$CLUSHTARGETS")
+CLUSHTARGETS=$(Expand "$CLUSHTARGETS")
 
 # Create functions
 eval "postcmd () { $POSTCMD; }"
@@ -336,4 +350,5 @@ trap '/bin/rm -f "$ERRORS"' 0
 	Paragraph "$TITLE" |
 	POST |
 	OUT
+
 

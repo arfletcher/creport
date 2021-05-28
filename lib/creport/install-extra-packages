@@ -16,7 +16,8 @@ lsb_release -sir | egrep 'CentOS\ [345].' >/dev/null && exit 0
 
 NEEDED="ksh wmctrl zsh xterm clamav virt-what ssh-x509-auth moreutils fping waltz"
 NEED_RPM="xorg-x11-xauth perl-Proc-ProcessTable redhat-lsb-core dejavu-sans-mono-fonts xorg-x11-apps smipmicfg dejavu-sans-mono-fonts perl-File-chdir"
-NEED_DEB="xauth libproc-processtable-perl chkconfig libfile-chdir-perl"
+NEED_DEB="xauth libproc-processtable-perl libfile-chdir-perl"
+#NEED_DEB="xauth libproc-processtable-perl chkconfig libfile-chdir-perl"
 
 if ! type lsb_release >/dev/null 
 then
@@ -31,6 +32,7 @@ INSTALL=
 case "$(lsb_release -si)" in
 	Fedora)		CHECK="rpm -q"; INSTALL="dnf -y install"; TYPE=RPM ;;
 	RedHat*)	CHECK="rpm -q"; INSTALL="yum -y install"; TYPE=RPM;;
+	Oracle*)	CHECK="rpm -q"; INSTALL="yum -y install"; TYPE=RPM;;
 	CentOS)		CHECK="rpm -q"; INSTALL="yum -y install"; TYPE=RPM;;
 	Debian)		CHECK="dpkg -L"; INSTALL="apt -y install"; TYPE=DEB;;
 	Ubuntu)		CHECK="dpkg -L"; INSTALL="apt -y install"; TYPE=DEB;;

@@ -1,14 +1,20 @@
 #!/bin/ksh
 
-## Report agent deployment.
-## List the information on required agents: running, config, etc..
-## BigFix, Tenable, Carbon Black, FireEye HX, ClamAV, Splunk.
+### Report agent deployment.
+### List the information on required agents: running, config, etc..
+### BigFix, Tenable, Carbon Black, FireEye HX, ClamAV, Splunk.
+###
+### * BigFix, Tenable, ClamAV on everywhere
+### * SplunkForwarder on on all external systems
+### * EndGame, Forescout, CarbonBlack should be off everywhere
 
 # creport options.
-##clushopt -Lq
+##clushopt -Lq -u 60
 ##groupby results
 
-###### Payload ###############
+
+
+# ##### Payload ###############
 
 # List of systems to exclude.
 [[ $(lsb_release -sir) = CentOS\ 5.* ]] && echo Ignored && exit 0
@@ -26,6 +32,9 @@ reportagent () {
 [ -x /usr/bin/clamscan ] && echo ClamAV is installed || echo ClamAV is not installed
 clamscan -V | sed -e 's!/... .*!!' -e 's/ / version /'
 
+# check signatures are fresh
+clamscan --quiet -i /etc/shells 2>&1 | grep older | sed -e 's/^/ClamAV /'
+
 ###############################################
 # Carbon Black
 lsb_release -si | egrep -i "CentOS|Redhat|Scientific" >/dev/null && reportagent cbdaemon CarbonBlack
@@ -38,8 +47,8 @@ reportagent nessusd Tenable Agent
 
 if [ -d /opt/nessus_agent ]
 then
-	/opt/nessus_agent/sbin/nessuscli agent status 2>&1 | egrep -i Link | egrep -v failed | sed -e 's/to:/to/' -e 's/\[.*\]/Tenable:/'
-	/opt/nessus_agent/sbin/nessusd -v | sed -n -e 's/ .build.*//' -e 's/nessusd (Nessus)/Tenable version/p'
+	/opt/nessus_agent/sbin/nessuscli agent status 2>&1 | egrep -i Link | egrep -v failed | sed -e 's/to:/to/' -e 's/^/Tenable: /'
+	/opt/nessus_agent/sbin/nessusd -v | sed -n -e 's/ .build.*//p' | sed -e 's/^/Tenable: /'
 
 	# Check Tenable daily scan
 	LOG=/opt/nessus_agent/var/nessus/logs/backend.log

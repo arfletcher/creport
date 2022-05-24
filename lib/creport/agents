@@ -7,12 +7,14 @@
 ### * BigFix, Tenable, ClamAV on everywhere
 ### * SplunkForwarder on on all external systems
 ### * EndGame, Forescout, CarbonBlack should be off everywhere
+###
+
+#    usage: agents [<check>]*
+#    usage: creport agents [<check>]*
 
 # creport options.
-##clushopt -Lq -u 60
+##clushopt -Lq -u 160
 ##groupby results
-
-
 
 # ##### Payload ###############
 
@@ -29,22 +31,26 @@ reportagent () {
 
 ###############################################
 # ClamAV
+R_clamav () {
 [ -x /usr/bin/clamscan ] && echo ClamAV is installed || echo ClamAV is not installed
 clamscan -V | sed -e 's!/... .*!!' -e 's/ / version /'
 
 # check signatures are fresh
 clamscan --quiet -i /etc/shells 2>&1 | grep older | sed -e 's/^/ClamAV /'
+}
 
 ###############################################
 # Carbon Black
+R_carbonblack () {
 lsb_release -si | egrep -i "CentOS|Redhat|Scientific" >/dev/null && reportagent cbdaemon CarbonBlack
 [ -x /usr/sbin/cbdaemon ] && /usr/sbin/cbdaemon -v | sed -n -e 's/ (.*//' -e 's/CbDaemon/CarbonBlack/p'
+}
 
 ###############################################
 # Tenable 
 
+R_tenable () {
 reportagent nessusd Tenable Agent
-
 if [ -d /opt/nessus_agent ]
 then
 	/opt/nessus_agent/sbin/nessuscli agent status 2>&1 | egrep -i Link | egrep -v failed | sed -e 's/to:/to/' -e 's/^/Tenable: /'
@@ -69,9 +75,11 @@ then
 else
 	echo Tenable not installed
 fi
+}
 
 ###############################################
 # BigFix
+R_bigfix () {
 reportagent BESClient BigFix
 
 if [ -d /var/opt/BESClient ]
@@ -103,10 +111,12 @@ fi
 du -sh '/opt/tivoli' 2>/dev/null | egrep '[TG]' > /dev/null && echo "BigFix Large Tivoli cache"
 
 fi
+}
 
 
 ###############################################
 # Splunk
+R_splunk () {
 reportagent splunkd Splunk Forwarder
 
 DIR=/opt/splunkforwarder/var/log/splunk
@@ -131,22 +141,44 @@ then
 	# Permssions issues.
 	egrep $(date "+^%m-%d-%Y ") $DIR/splunkd.log | sed -n -e 's/.*error getting attributes of path "//p' | sed -e 's/".*//' | sort | uniq | ifne paste -d, -s | sed -e 's/^/Splunk Permission issues: /'
 fi
+}
 
 ###############################################
 # FireEye HX
-reportagent xagt FireEyeHX
-if [ -x /opt/fireeye/bin/xagt ]
-then
+R_fireeye () {
+	reportagent xagt FireEyeHX
+	[ ! -x /opt/fireeye/bin/xagt ] && echo FireEyeHX not installed && return
+
 	/opt/fireeye/bin/xagt -v | sed -e 's/^/FireEyeHX version /'
 
-	/opt/fireeye/bin/xagt -G -T 3600 |
-        	sed -n -e 's/.  Attempt: [0-9]*$//' -e 's/.*tcp.cc:0827: m=TCPConnect //p' |
-		sort | uniq | paste -s -d, |
-		sed -e 's/^/FireEyeHX connections /'
-fi
+	#/opt/fireeye/bin/xagt -G -T 3600 |
+        	#sed -n -e 's/.  Attempt: [0-9]*$//' -e 's/.*tcp.cc:0827: m=TCPConnect //p' |
+		#sort | uniq | paste -s -d, |
+		#sed -e 's/^/FireEyeHX connections /'
+
+	NOW=$(mktemp)
+	/opt/fireeye/bin/xagt -x "$NOW"  2>/dev/null >/dev/null
+	{
+	if type jq >/dev/null 2>/dev/null
+	then
+		jq -r .serverlist.servers[].server  "$NOW" 
+	else
+		sed -n -e 's/"//g' -e 's/.*server:[[:space:]]*//p' "$NOW"
+	fi
+	} | sort | paste -s -d, | sed -e 's/^/FireEyeHX connections /'
+	rm -f "$NOW"
+
+	# Any connection failures
+	/opt/fireeye/bin/xagt -T 86400 -G  2>/dev/null | grep -q 'm=Error on connect' && echo FireEyeHX connection errors
+
+	# NB: tail log: /opt/fireeye/bin/xagt -T 60 -F -G
+	# NB: see jobs in last day:  /opt/fireeye/bin/xagt -T 86400 -G | grep 'm=#JOB#'
+	/opt/fireeye/bin/xagt -T 86400 -G  2>/dev/null | grep -q 'm=#JOB#' && echo FireEyeHX jobs run || echo FireEyeHX jobs not run
+}
 
 ###############################################
 # Forescout
+R_forescout () {
 reportagent ForeScoutSecureConnector.bin Forescout
 LOG=/usr/lib/forescout/bin/log/fs_sc.log
 if [ -f "$LOG" ]
@@ -156,12 +188,47 @@ then
 	sed -n -e 's/",$//' -e 's/.*sc_version": "/Forescout version /p' ${LOGS} | tail -1
 	sed -n 's/.*got compliance message :/Forescout status/p' ${LOGS} | tail -1
 fi
+}
 
 ###############################################
 # Endgame
-reportagent esensor Endgame
+R_endgame () {
+	reportagent esensor Endgame
+	pgrep esensor | xargs -r lsof -p | sed -n 's/.*TCP .*->/Endgame connected to /p' | sed -n -e 's/ (ESTABLISHED)//p' 
+}
 
-pgrep esensor | xargs -r lsof -p | sed -n 's/.*TCP .*->/Endgame connected to /p' | sed -n -e 's/ (ESTABLISHED)//p' 
+############################################################################################
+# Command line
+list=
+USAGE="Usage: $0 [<options>] [<agents>]*
+       creport $0 [<options>] [<agents>]*
+
+Options:
+	-h	This help message
+
+Agents:
+$( functions | sed -n -e 's/R_/   /p' | sed -e 's/().*//' | sort )
+
+"
+while getopts ":h" optchar
+do
+        case $optchar in
+                h)  echo "$USAGE" ; exit 0 ;;
+
+                \:) echo "Missing option value for -$OPTARG" >&2 ; exit 1 ;;
+                \?) echo "Invalid option: -$OPTARG" >&2 ; exit 1 ;;
+        esac
+done
+shift $((OPTIND-1))
+############################################################################################
+
+# Run sub-agent functions
+# The default is all checks.
+[ "$#" = 0 ] && set -- $( functions | sed -n -e 's/R_//p' | sed -e 's/().*//' | sort )
+for func
+do
+	type R_$func 2>&1 | grep -q 'is a function' && R_$func || echo "$func: no such agent"
+done
 
 exit 0
 

@@ -9,6 +9,8 @@
 ## clush -w @hosts:SIO
 ## post sed -e 's/^  //'
 
+#exec > /etc/asset.stan
+
 # command line
 hideempty=1
 quick=

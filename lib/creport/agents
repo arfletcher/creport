@@ -227,7 +227,8 @@ shift $((OPTIND-1))
 [ "$#" = 0 ] && set -- $( functions | sed -n -e 's/R_//p' | sed -e 's/().*//' | sort )
 for func
 do
-	type R_$func 2>&1 | grep -q 'is a function' && R_$func || echo "$func: no such agent"
+	type "R_$func" 2>&1 | ! grep -q 'is a function' && echo "$func: no such agent" && continue
+	"R_$func"
 done
 
 exit 0

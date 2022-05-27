@@ -12,7 +12,7 @@ HOST=$(hostname -s)
 DATE=$(date "+%b %e %H:..:.. $HOST")
 
 # Only a CentOS/RHEL issue
-lsb_release -d | ! egrep 'CentOS|Red Hat' > /dev/null && exit
+lsb_release -d | ! egrep 'Alma|Rocky|CentOS|Red Hat' > /dev/null && exit
 
 # Is it broken on this host?
 egrep "^$DATE" /var/log/cron | ! egrep 'FAILED to authorize' > /dev/null && exit
